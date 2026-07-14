@@ -8,7 +8,7 @@ from io import BytesIO
 st.title("AOP Excel Database Converter")
 
 uploaded_file = st.file_uploader(
-    "Upload 2026 AOP ARKEMA Excel file",
+    "Upload 202x AOP SALESMAN Excel file",
     type=["xlsx"]
 )
 
