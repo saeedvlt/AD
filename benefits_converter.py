@@ -22,6 +22,21 @@ uploaded_file = st.file_uploader(
     type=["xlsx"]
 )
 
+MONTH_MAP = {
+    "Jan": "01 - Jan",
+    "Feb": "02 - Feb",
+    "Mar": "03 - Mar",
+    "Apr": "04 - Apr",
+    "May": "05 - May",
+    "Jun": "06 - Jun",
+    "Jul": "07 - Jul",
+    "Aug": "08 - Aug",
+    "Sep": "09 - Sep",
+    "Oct": "10 - Oct",
+    "Nov": "11 - Nov",
+    "Dec": "12 - Dec"
+}
+
 META_COLS = {
     1: "Emp #",
     2: "Name",
@@ -157,7 +172,7 @@ if uploaded_file:
             rec = employee.copy()
 
             rec["Benefit"] = benefit
-            rec["Month"] = month
+            rec["Month"] = MONTH_MAP.get(month, month)
             rec["Amount"] = value
 
             records.append(rec)
