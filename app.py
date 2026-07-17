@@ -12,21 +12,49 @@ st.set_page_config(
 )
 
 st.title("📊 Budget Database Toolkit")
+st.caption("Convert budget templates into clean databases.")
+
+st.info(
+    """
+    1. Select the template type.
+    2. Upload the Excel workbook.
+    3. Click Download.
+    """
+)
+
+
+CONVERTERS = {
+    "Expense Template": (
+        expense_convert,
+        "Expense Database.xlsx",
+    ),
+    "Benefits Template": (
+        benefits_convert,
+        "Benefits Database.xlsx",
+    ),
+    "Sales Template": (
+        sales_convert,
+        "Sales Database.xlsx",
+    ),
+}
 
 converter = st.selectbox(
     "Choose a converter",
-    [
-        "Expense Template",
-        "Benefits Template",
-        "Sales Template"
-
-    ]
+    list(CONVERTERS.keys())
 )
+
+upload_labels = {
+    "Expense Template": "Upload Expense Template Workbook",
+    "Benefits Template": "Upload Benefits Template Workbook",
+    "Sales Template": "Upload Sales Template Workbook",
+}
+
 
 uploaded_file = st.file_uploader(
-    "Upload Excel Workbook",
+    upload_labels[converter],
     type=["xlsx"]
 )
+
 
 if uploaded_file:
 
@@ -34,14 +62,14 @@ if uploaded_file:
 
         with st.spinner("Processing workbook..."):
 
-            if converter == "Expense Template":
-                df = expense_convert(uploaded_file)
+            try:
 
-            elif converter == "Benefits Template":
-                df = benefits_convert(uploaded_file)
+                 convert_function, output_filename = CONVERTERS[converter]
+                 df = convert_function(uploaded_file)
 
-            elif converter == "Sales Template":
-                df = sales_convert(uploaded_file)
+            except Exception as e:
+                 st.error(f"❌ {e}")
+                 st.stop()
 
         st.success(f"{len(df):,} rows created.")
 
@@ -54,8 +82,8 @@ if uploaded_file:
         output.seek(0)
 
         st.download_button(
-            "Download Database",
-            output,
-            "Database.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            label="Download Database",
+            data=output,
+            file_name=output_filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
