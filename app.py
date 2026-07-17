@@ -2,7 +2,7 @@ import streamlit as st
 from io import BytesIO
 
 from converters.expense import convert as expense_convert
-# from converters.benefits import convert as benefits_convert
+from converters.benefits import convert as benefits_convert
 from converters.sales import convert as sales_convert
 
 st.set_page_config(
@@ -17,7 +17,7 @@ converter = st.selectbox(
     "Choose a converter",
     [
         "Expense Template",
-#        "Benefits Template",
+        "Benefits Template",
         "Sales Template"
 
     ]
@@ -37,8 +37,8 @@ if uploaded_file:
             if converter == "Expense Template":
                 df = expense_convert(uploaded_file)
 
-#            elif converter == "Benefits Template":
-#                df = benefits_convert(uploaded_file)
+            elif converter == "Benefits Template":
+                df = benefits_convert(uploaded_file)
 
             elif converter == "Sales Template":
                 df = sales_convert(uploaded_file)

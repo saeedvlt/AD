@@ -1,26 +1,9 @@
-import streamlit as st
 import pandas as pd
 from openpyxl import load_workbook
 from datetime import datetime
-from io import BytesIO
 import re
 
-st.set_page_config(
-    page_title="Benefits Template Converter",
-    page_icon="👥",
-    layout="wide"
-)
 
-st.title("👥 Benefits Template Converter")
-
-st.write(
-    "Upload a Benefits Budget workbook and convert it into a Power BI-ready database."
-)
-
-uploaded_file = st.file_uploader(
-    "Upload Excel Workbook",
-    type=["xlsx"]
-)
 
 MONTH_MAP = {
     "Jan": "01 - Jan",
@@ -66,7 +49,7 @@ def split_name(name):
     return name, ""
 
 
-if uploaded_file:
+def convert(uploaded_file):
 
     wb = load_workbook(
         uploaded_file,
@@ -74,22 +57,16 @@ if uploaded_file:
     )
 
     if "Benefits" in wb.sheetnames:
-        ws = wb["Benefits"]
+    	ws = wb["Benefits"]
     else:
-        st.error("Worksheet 'Benefits' not found.")
-        st.stop()
-
+    	raise ValueError("Worksheet 'Benefits' not found.")
+    
     benefit_cols = {}
 
     current_benefit = None
 
-    progress = st.progress(0)
-
-    total_cols = ws.max_column - 6
-
     for idx, col in enumerate(range(7, ws.max_column + 1)):
 
-        progress.progress(idx / total_cols)
 
         top = ws.cell(4, col).value
         low = ws.cell(5, col).value
@@ -140,11 +117,7 @@ if uploaded_file:
 
     records = []
 
-    total_rows = ws.max_row - 6
-
     for i, row in enumerate(range(7, ws.max_row + 1)):
-
-        progress.progress(i / total_rows)
 
         employee = {}
 
@@ -199,30 +172,5 @@ if uploaded_file:
 
     df = df[cols]
 
-    st.success(f"Created {len(df):,} records.")
-
-    st.dataframe(
-        df.head(100),
-        use_container_width=True
-    )
-
-    output = BytesIO()
-
-    with pd.ExcelWriter(
-        output,
-        engine="openpyxl"
-    ) as writer:
-
-        df.to_excel(
-            writer,
-            index=False
-        )
-
-    output.seek(0)
-
-    st.download_button(
-        "📥 Download Database",
-        data=output,
-        file_name="Benefits_Database.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    return df
+    
