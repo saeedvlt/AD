@@ -3,6 +3,8 @@ from io import BytesIO
 
 from converters.expense import convert as expense_convert
 from converters.benefits import convert as benefits_convert
+from converters.sales import convert as sales_convert
+
 
 st.set_page_config(
     page_title="Budget Database Toolkit",
@@ -12,11 +14,16 @@ st.set_page_config(
 
 st.title("📊 Budget Database Toolkit")
 
+st.write(
+    "Convert budgeting templates into Power BI-ready databases."
+)
+
 converter = st.selectbox(
     "Choose a converter",
     [
         "Expense Template",
-        "Benefits Template"
+        "Benefits Template",
+        "Sales Template"
     ]
 )
 
@@ -39,7 +46,11 @@ if uploaded_file:
                 df = benefits_convert(uploaded_file)
                 filename = "Benefits_Database.xlsx"
 
-        st.success(f"{len(df):,} rows created.")
+            elif converter == "Sales Template":
+                df = sales_convert(uploaded_file)
+                filename = "Sales_Database.xlsx"
+
+        st.success(f"Finished! {len(df):,} records created.")
 
         st.dataframe(
             df.head(100),
