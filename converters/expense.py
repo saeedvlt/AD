@@ -70,7 +70,8 @@ def find_header_row(ws: Worksheet) -> int | None:
     """Find the first header row that contains at least six month names."""
     for row in range(1, min(ws.max_row, 40) + 1):
         month_count = sum(
-            clean_text(ws.cell(row, column).value) in MONTH_MAP
+            clean_text(ws.cell(row, column).value).casefold()
+            in {month.casefold() for month in MONTH_MAP}
             for column in range(1, ws.max_column + 1)
         )
         if month_count >= 6:
@@ -79,12 +80,17 @@ def find_header_row(ws: Worksheet) -> int | None:
 
 
 def find_month_columns(ws: Worksheet, header_row: int) -> dict[str, int]:
-    """Return final month labels and their corresponding worksheet columns."""
+    """Return Jan–Dec columns identified from their actual header labels.
+
+    Fields such as Start Period, End Period, Amount, and Totals are
+    deliberately excluded: only one of the month-name headers is accepted.
+    """
+    normalized_headers = {month.casefold(): label for month, label in MONTH_MAP.items()}
     columns: dict[str, int] = {}
     for column in range(1, ws.max_column + 1):
-        header = clean_text(ws.cell(header_row, column).value)
-        if header in MONTH_MAP:
-            columns[MONTH_MAP[header]] = column
+        header = clean_text(ws.cell(header_row, column).value).casefold()
+        if header in normalized_headers:
+            columns[normalized_headers[header]] = column
     return columns
 
 
@@ -107,9 +113,25 @@ def as_amount(value: Any) -> float:
         return 0.0
 
 
-def row_has_monthly_data(ws: Worksheet, row: int, month_columns: dict[str, int]) -> bool:
-    """Return True when a detail row has an amount in at least one month."""
-    return any(as_amount(ws.cell(row, column).value) != 0 for column in month_columns.values())
+def row_has_monthly_data(
+    value_ws: Worksheet,
+    formula_ws: Worksheet,
+    row: int,
+    month_columns: dict[str, int],
+) -> bool:
+    """Return True when a detail row has a monthly value or monthly formula.
+
+    The values workbook gives us calculated amounts.  The formulas workbook
+    prevents an Excel formula row from being mistaken for a blank heading when
+    its cached value has not yet been refreshed.
+    """
+    for column in month_columns.values():
+        if as_amount(value_ws.cell(row, column).value) != 0:
+            return True
+        formula = formula_ws.cell(row, column).value
+        if isinstance(formula, str) and formula.startswith("="):
+            return True
+    return False
 
 
 def convert(uploaded_file: Any) -> pd.DataFrame:
@@ -126,7 +148,13 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
     - Rounds every Amount to two decimals.
     - Recognizes both Process Planning and Processing Planning.
     """
+    # Read calculated values for output and formula cells for reliable row
+    # classification.  Streamlit UploadedFile objects need rewinding between
+    # the two reads.
     workbook = load_workbook(uploaded_file, data_only=True)
+    if hasattr(uploaded_file, "seek"):
+        uploaded_file.seek(0)
+    formula_workbook = load_workbook(uploaded_file, data_only=False)
     records: list[dict[str, Any]] = []
 
     for sheet_name in workbook.sheetnames:
@@ -134,6 +162,7 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             continue
 
         ws = workbook[sheet_name]
+        formula_ws = formula_workbook[sheet_name]
         header_row = find_header_row(ws)
         if header_row is None:
             continue
@@ -156,7 +185,12 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             if is_summary_or_headcount_row(column_a, column_b, column_c):
                 continue
 
-            has_monthly_data = row_has_monthly_data(ws, row, month_columns)
+            has_monthly_data = row_has_monthly_data(
+                ws,
+                formula_ws,
+                row,
+                month_columns,
+            )
 
             # A GL section normally has a label such as "Building - 7555"
             # and no monthly amounts.  The old converter treated *every* row
