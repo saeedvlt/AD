@@ -1,7 +1,7 @@
 import streamlit as st
 from io import BytesIO
 
-from converters.expense import convert as expense_convert
+from converters.expense_v2 import convert as expense_convert
 from converters.benefits import convert as benefits_convert
 from converters.sales import convert as sales_convert
 
