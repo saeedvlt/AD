@@ -116,114 +116,90 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
     output = data.copy()
 
     # ---------------------------------------------------------
-    # 1. Total Sales by Plant / Month
+    # Plant Sales (Sales only)
     # ---------------------------------------------------------
-    location_sales = (
+    plant_sales = (
         output.loc[output["Section"] == "Sales"]
-        .groupby(["Location", "Period"], as_index=False)["Amount"]
+        .groupby(
+            ["Location", "Period"],
+            as_index=False,
+        )["Amount"]
         .sum()
-        .rename(columns={"Amount": "Location Total Sales"})
+        .rename(columns={"Amount": "_plant_sales"})
     )
 
     output = output.merge(
-        location_sales,
+        plant_sales,
         on=["Location", "Period"],
         how="left",
     )
 
-# ---------------------------------------------------------
-# Territory totals by Category
-# Used for:
-# Plant Share of Territory Category %
-# ---------------------------------------------------------
-territory_totals = (
-    output.groupby(
-        [
+    # ---------------------------------------------------------
+    # Territory totals by category
+    # ---------------------------------------------------------
+    territory_totals = (
+        output.groupby(
+            [
+                "Territory",
+                "Section",
+                "Line Item",
+                "Period",
+            ],
+            as_index=False,
+        )["Amount"]
+        .sum()
+        .rename(columns={"Amount": "_territory_total"})
+    )
+
+    output = output.merge(
+        territory_totals,
+        on=[
             "Territory",
             "Section",
             "Line Item",
             "Period",
         ],
-        as_index=False,
-    )["Amount"]
-    .sum()
-    .rename(columns={"Amount": "_territory_total"})
-)
+        how="left",
+    )
 
-output = output.merge(
-    territory_totals,
-    on=[
-        "Territory",
-        "Section",
-        "Line Item",
-        "Period",
-    ],
-    how="left",
-)
-
-output["Plant Share of Territory Category %"] = percent(
-    output["Amount"],
-    output["_territory_total"],
-)
-
-    # ---------------------------------------------------------
-    # 3. Category % of Plant Sales
-    # ---------------------------------------------------------
-    output["Category % of Plant Sales"] = percent(
+    output["Plant Share of Territory Category %"] = percent(
         output["Amount"],
-        output["Location Total Sales"],
+        output["_territory_total"],
     )
 
     # ---------------------------------------------------------
-    # 4. Build Sales / Material / Labour / Overhead table
-    # by Plant + Line Item + Month
+    # Category % of Plant Sales
     # ---------------------------------------------------------
-    matching = (
-        output.groupby(
+    output["Category % of Plant Sales"] = percent(
+        output["Amount"],
+        output["_plant_sales"],
+    )
+
+    # ---------------------------------------------------------
+    # Matching Sales lookup
+    # ---------------------------------------------------------
+    sales_lookup = (
+        output.loc[output["Section"] == "Sales"]
+        [
             [
                 "Location",
                 "Line Item",
                 "Period",
-                "Section",
-            ],
-            as_index=False,
-        )["Amount"]
-        .sum()
-        .pivot_table(
-            index=[
+                "Amount",
+            ]
+        ]
+        .rename(columns={"Amount": "_matching_sales"})
+        .drop_duplicates(
+            subset=[
                 "Location",
                 "Line Item",
                 "Period",
-            ],
-            columns="Section",
-            values="Amount",
-            aggfunc="sum",
+            ]
         )
-        .reset_index()
-    )
-
-    matching.columns.name = None
-
-    for section in (
-        "Sales",
-        "Material",
-        "Labour",
-        "Overhead",
-    ):
-        if section not in matching.columns:
-            matching[section] = pd.NA
-
-    matching = matching.rename(
-        columns={
-            "Sales": "_sales",
-            "Material": "_material",
-            "Labour": "_labour",
-            "Overhead": "_overhead",
-        }
     )
 
     output = output.merge(
-        matching,
+        sales_lookup,
         on=[
             "Location",
             "Line Item",
@@ -232,47 +208,59 @@ output["Plant Share of Territory Category %"] = percent(
         how="left",
     )
 
+    # ---------------------------------------------------------
+    # Initialize columns
+    # ---------------------------------------------------------
     output["Material % of Matching Sales"] = pd.NA
     output["Labour % of Matching Sales"] = pd.NA
     output["Overhead % of Matching Sales"] = pd.NA
 
-    calculations = (
-        (
-            "Material",
-            "_material",
-            "Material % of Matching Sales",
-        ),
-        (
-            "Labour",
-            "_labour",
-            "Labour % of Matching Sales",
-        ),
-        (
-            "Overhead",
-            "_overhead",
-            "Overhead % of Matching Sales",
-        ),
+    # ---------------------------------------------------------
+    # Material
+    # ---------------------------------------------------------
+    mask = output["Section"] == "Material"
+
+    output.loc[
+        mask,
+        "Material % of Matching Sales",
+    ] = percent(
+        output.loc[mask, "Amount"],
+        output.loc[mask, "_matching_sales"],
     )
 
-    for section, amount_column, result_column in calculations:
+    # ---------------------------------------------------------
+    # Labour
+    # ---------------------------------------------------------
+    mask = output["Section"] == "Labour"
 
-        mask = output["Section"].eq(section)
+    output.loc[
+        mask,
+        "Labour % of Matching Sales",
+    ] = percent(
+        output.loc[mask, "Amount"],
+        output.loc[mask, "_matching_sales"],
+    )
 
-        output.loc[mask, result_column] = percent(
-            output.loc[mask, amount_column],
-            output.loc[mask, "_sales"],
-        )
+    # ---------------------------------------------------------
+    # Overhead
+    # ---------------------------------------------------------
+    mask = output["Section"] == "Overhead"
+
+    output.loc[
+        mask,
+        "Overhead % of Matching Sales",
+    ] = percent(
+        output.loc[mask, "Amount"],
+        output.loc[mask, "_matching_sales"],
+    )
 
     return output.drop(
         columns=[
+            "_plant_sales",
             "_territory_total",
-            "_sales",
-            "_material",
-            "_labour",
-            "_overhead",
+            "_matching_sales",
         ]
     )
-
 def convert(uploaded_file: Any) -> pd.DataFrame:
     """Return base-detail margin analysis data in long format.
 
