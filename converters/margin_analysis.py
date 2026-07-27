@@ -1,6 +1,6 @@
-"""Unpivot base-detail rows from the 2025 Margin Analysis workbook.
+"""Unpivot base-detail Margin Analysis data and add requested percentages.
 
-Designed for the Budget Database Toolkit.  It processes Windsor, Cambridge,
+Designed for the Budget Database Toolkit. It processes Windsor, Cambridge,
 Montreal, and Ithaca and returns a normalized pandas DataFrame.
 """
 
@@ -16,6 +16,14 @@ from openpyxl.worksheet.worksheet import Worksheet
 
 
 LOCATIONS = ("Windsor", "Cambridge", "Montreal", "Ithaca")
+
+TERRITORIES = {
+    "Windsor": "CDN",
+    "Cambridge": "CDN",
+    "Montreal": "CDN",
+    "Ithaca": "US",
+}
+
 SECTION_NAMES = {
     "sales": "Sales",
     "material": "Material",
@@ -41,24 +49,30 @@ def find_month_columns(ws: Worksheet) -> dict[int, datetime]:
     for row in range(1, min(ws.max_row, 15) + 1):
         for start_column in range(1, ws.max_column - 10):
             values = [ws.cell(row, start_column + offset).value for offset in range(12)]
-            if all(isinstance(value, (datetime, date)) for value in values):
-                periods = [
-                    datetime(value.year, value.month, 1)
-                    if isinstance(value, date) and not isinstance(value, datetime)
-                    else datetime(value.year, value.month, 1)
-                    for value in values
-                ]
-                if [period.month for period in periods] == list(range(1, 13)):
-                    return {
-                        start_column + offset: period
-                        for offset, period in enumerate(periods)
-                    }
-    raise ValueError(f"Could not find a Jan–Dec date series on worksheet '{ws.title}'.")
+
+            if not all(isinstance(value, (datetime, date)) for value in values):
+                continue
+
+            periods = [
+                datetime(value.year, value.month, 1)
+                for value in values
+            ]
+
+            if [period.month for period in periods] == list(range(1, 13)):
+                return {
+                    start_column + offset: period
+                    for offset, period in enumerate(periods)
+                }
+
+    raise ValueError(
+        f"Could not find a Jan–Dec date series on worksheet '{ws.title}'."
+    )
 
 
 def is_derived_line(label: str) -> bool:
     """Exclude calculated totals, ratios, and reconciliation lines."""
     normalized = label.casefold()
+
     return (
         normalized.startswith("total")
         or normalized.startswith("per ")
@@ -73,13 +87,181 @@ def is_derived_line(label: str) -> bool:
     )
 
 
-def has_monthly_amount(ws: Worksheet, row: int, month_columns: dict[int, datetime]) -> bool:
-    """Keep a base row only when at least one of its 12 months has a value."""
+def has_monthly_amount(
+    ws: Worksheet,
+    row: int,
+    month_columns: dict[int, datetime],
+) -> bool:
+    """Keep a base row only when at least one month contains a value."""
     return any(
-        is_number(ws.cell(row, column).value) and ws.cell(row, column).value != 0
+        is_number(ws.cell(row, column).value)
+        and ws.cell(row, column).value != 0
         for column in month_columns
     )
 
+
+def percent(
+    numerator: pd.Series,
+    denominator: pd.Series,
+) -> pd.Series:
+    """Return percentages on a 0–100 scale."""
+    return (
+        numerator.div(denominator.where(denominator != 0))
+        * 100
+    ).round(2)
+
+def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
+    """Add all derived percentage calculations."""
+
+    output = data.copy()
+
+    # ---------------------------------------------------------
+    # 1. Total Sales by Plant / Month
+    # ---------------------------------------------------------
+    location_sales = (
+        output.loc[output["Section"] == "Sales"]
+        .groupby(["Location", "Period"], as_index=False)["Amount"]
+        .sum()
+        .rename(columns={"Amount": "Location Total Sales"})
+    )
+
+    output = output.merge(
+        location_sales,
+        on=["Location", "Period"],
+        how="left",
+    )
+
+    # ---------------------------------------------------------
+    # 2. Territory totals by Section
+    # Used for:
+    # Plant Share of Territory Category %
+    # ---------------------------------------------------------
+    territory_totals = (
+        output.groupby(
+            ["Territory", "Section", "Period"],
+            as_index=False,
+        )["Amount"]
+        .sum()
+        .rename(columns={"Amount": "_territory_total"})
+    )
+
+    output = output.merge(
+        territory_totals,
+        on=["Territory", "Section", "Period"],
+        how="left",
+    )
+
+    output["Plant Share of Territory Category %"] = percent(
+        output["Amount"],
+        output["_territory_total"],
+    )
+
+    # ---------------------------------------------------------
+    # 3. Category % of Plant Sales
+    # ---------------------------------------------------------
+    output["Category % of Plant Sales"] = percent(
+        output["Amount"],
+        output["Location Total Sales"],
+    )
+
+    # ---------------------------------------------------------
+    # 4. Build Sales / Material / Labour / Overhead table
+    # by Plant + Line Item + Month
+    # ---------------------------------------------------------
+    matching = (
+        output.groupby(
+            [
+                "Location",
+                "Line Item",
+                "Period",
+                "Section",
+            ],
+            as_index=False,
+        )["Amount"]
+        .sum()
+        .pivot_table(
+            index=[
+                "Location",
+                "Line Item",
+                "Period",
+            ],
+            columns="Section",
+            values="Amount",
+            aggfunc="sum",
+        )
+        .reset_index()
+    )
+
+    matching.columns.name = None
+
+    for section in (
+        "Sales",
+        "Material",
+        "Labour",
+        "Overhead",
+    ):
+        if section not in matching.columns:
+            matching[section] = pd.NA
+
+    matching = matching.rename(
+        columns={
+            "Sales": "_sales",
+            "Material": "_material",
+            "Labour": "_labour",
+            "Overhead": "_overhead",
+        }
+    )
+
+    output = output.merge(
+        matching,
+        on=[
+            "Location",
+            "Line Item",
+            "Period",
+        ],
+        how="left",
+    )
+
+    output["Material % of Matching Sales"] = pd.NA
+    output["Labour % of Matching Sales"] = pd.NA
+    output["Overhead % of Matching Sales"] = pd.NA
+
+    calculations = (
+        (
+            "Material",
+            "_material",
+            "Material % of Matching Sales",
+        ),
+        (
+            "Labour",
+            "_labour",
+            "Labour % of Matching Sales",
+        ),
+        (
+            "Overhead",
+            "_overhead",
+            "Overhead % of Matching Sales",
+        ),
+    )
+
+    for section, amount_column, result_column in calculations:
+
+        mask = output["Section"].eq(section)
+
+        output.loc[mask, result_column] = percent(
+            output.loc[mask, amount_column],
+            output.loc[mask, "_sales"],
+        )
+
+    return output.drop(
+        columns=[
+            "_territory_total",
+            "_sales",
+            "_material",
+            "_labour",
+            "_overhead",
+        ]
+    )
 
 def convert(uploaded_file: Any) -> pd.DataFrame:
     """Return base-detail margin analysis data in long format.
@@ -88,42 +270,75 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
     ``Adjust to Actual``) are intentionally excluded to prevent double-counting.
     Manual adjustment lines, such as ``Adjust: Rebates``, are retained.
     """
+
     workbook = load_workbook(uploaded_file, data_only=True)
-    missing_sheets = [name for name in LOCATIONS if name not in workbook.sheetnames]
+
+    missing_sheets = [
+        name
+        for name in LOCATIONS
+        if name not in workbook.sheetnames
+    ]
+
     if missing_sheets:
-        raise ValueError("Missing required worksheet(s): " + ", ".join(missing_sheets))
+        raise ValueError(
+            "Missing required worksheet(s): "
+            + ", ".join(missing_sheets)
+        )
 
     records: list[dict[str, Any]] = []
 
     for location in LOCATIONS:
+
         ws = workbook[location]
+
         month_columns = find_month_columns(ws)
+
         current_section: str | None = None
 
         for row in range(1, ws.max_row + 1):
+
             label = clean_text(ws.cell(row, 1).value)
             normalized_label = label.casefold()
 
+            # Detect section headers
             if normalized_label in SECTION_NAMES:
                 current_section = SECTION_NAMES[normalized_label]
                 continue
 
-            # Gross Margin and its following rows are report calculations,
-            # rather than base Sales/Material/Labour/Overhead detail.
+            # Ignore Gross Margin section
             if current_section == "Gross Margin":
                 continue
 
-            if not label or current_section is None or is_derived_line(label):
-                continue
-            if not has_monthly_amount(ws, row, month_columns):
+            # Skip blanks and calculated rows
+            if (
+                not label
+                or current_section is None
+                or is_derived_line(label)
+            ):
                 continue
 
+            if not has_monthly_amount(
+                ws,
+                row,
+                month_columns,
+            ):
+                continue
+
+            # Build normalized records
             for column, period in month_columns.items():
+
                 value = ws.cell(row, column).value
-                amount = round(float(value), 2) if is_number(value) else 0.0
+
+                amount = (
+                    round(float(value), 2)
+                    if is_number(value)
+                    else 0.0
+                )
+
                 records.append(
                     {
                         "Location": location,
+                        "Territory": TERRITORIES[location],
                         "Section": current_section,
                         "Line Item": label,
                         "Period": period,
@@ -132,5 +347,19 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                     }
                 )
 
-    columns = ["Location", "Section", "Line Item", "Period", "Month", "Amount"]
-    return pd.DataFrame(records, columns=columns)
+    columns = [
+        "Location",
+        "Territory",
+        "Section",
+        "Line Item",
+        "Period",
+        "Month",
+        "Amount",
+    ]
+
+    data = pd.DataFrame(records, columns=columns)
+
+    if data.empty:
+        return data
+
+    return add_percentages(data)
