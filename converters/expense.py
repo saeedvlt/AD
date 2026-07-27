@@ -41,9 +41,43 @@ MONTH_MAP = {
     "Dec": "12 - Dec",
 }
 
+# Header spellings are not fully consistent across the workbook.  These map
+# each accepted spelling to the canonical short month name used in MONTH_MAP.
+HEADER_MONTHS = {
+    "jan": "Jan",
+    "january": "Jan",
+    "feb": "Feb",
+    "february": "Feb",
+    "mar": "Mar",
+    "march": "Mar",
+    "apr": "Apr",
+    "april": "Apr",
+    "may": "May",
+    "jun": "Jun",
+    "june": "Jun",
+    "jul": "Jul",
+    "july": "Jul",
+    "aug": "Aug",
+    "august": "Aug",
+    "sep": "Sep",
+    "sept": "Sep",
+    "september": "Sep",
+    "oct": "Oct",
+    "october": "Oct",
+    "nov": "Nov",
+    "november": "Nov",
+    "dec": "Dec",
+    "december": "Dec",
+}
+MONTH_SEQUENCE = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+]
+
 # Both spellings occur in the templates.  Matching is case-insensitive.
 FUNCTION_NAMES = {
     "operations",
+    "cdn sales",
     "hr",
     "finance",
     "sales",
@@ -70,8 +104,7 @@ def find_header_row(ws: Worksheet) -> int | None:
     """Find the first header row that contains at least six month names."""
     for row in range(1, min(ws.max_row, 40) + 1):
         month_count = sum(
-            clean_text(ws.cell(row, column).value).casefold()
-            in {month.casefold() for month in MONTH_MAP}
+            clean_text(ws.cell(row, column).value).casefold() in HEADER_MONTHS
             for column in range(1, ws.max_column + 1)
         )
         if month_count >= 6:
@@ -85,19 +118,40 @@ def find_month_columns(ws: Worksheet, header_row: int) -> dict[str, int]:
     Fields such as Start Period, End Period, Amount, and Totals are
     deliberately excluded: only one of the month-name headers is accepted.
     """
-    normalized_headers = {month.casefold(): label for month, label in MONTH_MAP.items()}
-    columns: dict[str, int] = {}
-    for column in range(1, ws.max_column + 1):
-        header = clean_text(ws.cell(header_row, column).value).casefold()
-        if header in normalized_headers:
-            columns[normalized_headers[header]] = column
-    return columns
+    # Some Salary sheets contain additional allocation tables with their own
+    # month headings far to the right.  The old dictionary logic overwrote
+    # G:R (the budget months) with one of those later tables.  Select the
+    # first *contiguous Jan–Dec sequence* instead.
+    for start_column in range(1, ws.max_column - len(MONTH_SEQUENCE) + 2):
+        candidate = [
+            HEADER_MONTHS.get(
+                clean_text(ws.cell(header_row, start_column + offset).value).casefold()
+            )
+            for offset in range(len(MONTH_SEQUENCE))
+        ]
+        if candidate == MONTH_SEQUENCE:
+            return {
+                MONTH_MAP[month]: start_column + offset
+                for offset, month in enumerate(MONTH_SEQUENCE)
+            }
+
+    return {}
 
 
 def is_summary_or_headcount_row(*values: Any) -> bool:
     """Exclude titles and totals even when their month cells contain formulas."""
     text = " ".join(clean_text(value).casefold() for value in values)
     return any(word in text for word in EXCLUDED_ROW_WORDS)
+
+
+def is_functional_unit(text: str) -> bool:
+    """Recognize functional headings used across the expense templates."""
+    normalized = text.casefold()
+    return (
+        normalized in FUNCTION_NAMES
+        or normalized.startswith("process planning -")
+        or normalized.startswith("processing planning -")
+    )
 
 
 def as_amount(value: Any) -> float:
@@ -111,6 +165,18 @@ def as_amount(value: Any) -> float:
         return round(float(str(value).replace(",", "")), 2)
     except (TypeError, ValueError):
         return 0.0
+
+
+def clean_description(primary_value: Any, fallback_value: Any) -> str | None:
+    """Use a text description and never place a rate/FTE number in it."""
+    primary = clean_text(primary_value)
+    fallback = clean_text(fallback_value)
+    if primary:
+        try:
+            float(primary.replace(",", ""))
+        except ValueError:
+            return primary
+    return fallback or None
 
 
 def row_has_monthly_data(
@@ -180,6 +246,11 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             column_c = ws.cell(row, 3).value
             text = clean_text(column_a)
 
+            # Column A is the source item's identifier.  Blank-column-A rows
+            # are layout/formula rows and must never become output records.
+            if not text:
+                continue
+
             # Do this before setting context so Sub-total and Head Count labels
             # cannot overwrite a GL or functional unit for later detail rows.
             if is_summary_or_headcount_row(column_a, column_b, column_c):
@@ -192,17 +263,19 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                 month_columns,
             )
 
+            # Functional-unit headings must be checked before GL headings:
+            # "Process Planning - DS" contains a dash but is a department,
+            # not a GL section.  Its overtime rows inherit this value.
+            if is_functional_unit(text):
+                current_function = text
+                continue
+
             # A GL section normally has a label such as "Building - 7555"
-            # and no monthly amounts.  The old converter treated *every* row
-            # with a dash as a GL heading, which skipped valid rows such as
-            # Process Planning overtime lines when they contained amounts.
+            # and no monthly amounts.  A data row containing a dash remains a
+            # detail row and is not skipped.
             if " - " in text and not has_monthly_data:
                 current_gl = text
                 current_function = None
-                continue
-
-            if text.casefold() in FUNCTION_NAMES:
-                current_function = text
                 continue
 
             if not has_monthly_data:
@@ -217,7 +290,7 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                         "GL Account": current_gl,
                         "Functional Unit": current_function,
                         "Item": item,
-                        "Description": column_c,
+                        "Description": clean_description(column_c, column_b),
                         "Month": month,
                         "Amount": as_amount(ws.cell(row, column).value),
                     }
