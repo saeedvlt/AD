@@ -207,6 +207,51 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
         ],
         how="left",
     )
+    annual_category = (
+        output.groupby(
+            [
+                "Territory",
+                "Section",
+                "Line Item",
+            ],
+            as_index=False,
+        )["Amount"]
+        .sum()
+        .rename(columns={"Amount": "_annual_category_total"})
+    )
+
+    output = output.merge(
+        annual_category,
+        on=[
+            "Territory",
+            "Section",
+            "Line Item",
+        ],
+        how="left",
+    )
+
+    plant_category = (
+        output.groupby(
+            [
+                "Location",
+                "Section",
+                "Line Item",
+            ],
+            as_index=False,
+        )["Amount"]
+        .sum()
+        .rename(columns={"Amount": "_plant_category_total"})
+    )
+    
+    output = output.merge(
+        plant_category,
+        on=[
+            "Location",
+            "Section",
+            "Line Item",
+        ],
+        how="left",
+    )
 
     # ---------------------------------------------------------
     # Initialize columns
@@ -214,6 +259,10 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
     output["Material % of Matching Sales"] = pd.NA
     output["Labour % of Matching Sales"] = pd.NA
     output["Overhead % of Matching Sales"] = pd.NA
+    output["Plant Share of Annual Territory Category %"] = percent(
+        output["_plant_category_total"],
+        output["_annual_category_total"],
+    )
 
     # ---------------------------------------------------------
     # Material
@@ -359,5 +408,8 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
 
     if data.empty:
         return data
+
+    "_annual_category_total",
+    "_plant_category_total",
 
     return add_percentages(data)
