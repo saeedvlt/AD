@@ -62,9 +62,10 @@ FUNCTION_NAMES = {
     "production",
 }
 
-# Supports examples such as 7555-912, 7555 - 912, and 7555-912 - Building.
-GL_PATTERN = re.compile(
-    r"^\s*(?P<code>\d{3,}(?:\s*-\s*\d{2,})+)\s*(?:-\s*(?P<description>.+?))?\s*$"
+# Supports detail codes such as 7555-912, 01-7555-02, and 01 - 7555 - 201,
+# plus the four-digit roll-up codes used on some legacy sheets.
+GL_CODE_PATTERN = re.compile(
+    r"(?<!\d)(?:(?:\d{2,}\s*-\s*)+\d{2,}|\d{4,})(?!\d)"
 )
 
 DESCRIPTION_HEADER_NAMES = {
@@ -182,15 +183,27 @@ def find_item_column(ws: Worksheet, header_row: int, month_columns: dict[str, in
     return 1
 
 
-def parse_gl_header(text: str) -> tuple[str | None, str | None] | None:
-    """Return ``(GL Code, GL Description)`` when *text* is a GL section row."""
-    match = GL_PATTERN.match(text)
-    if not match:
+def find_gl_code(value: Any) -> str | None:
+    """Extract and normalize the first GL-like code found in a cell value."""
+    match = GL_CODE_PATTERN.search(_clean_text(value))
+    return re.sub(r"\s*-\s*", "-", match.group(0)) if match else None
+
+
+def parse_rollup_gl_header(text: str) -> tuple[str, str | None] | None:
+    """Parse a roll-up GL heading in either common source format.
+
+    Examples:
+    - ``7555-200 - Grinders``
+    - ``GRINDERS - 7555-200``
+    """
+    code = find_gl_code(text)
+    if code is None:
         return None
 
-    code = re.sub(r"\s*-\s*", "-", match.group("code"))
-    description = _clean_text(match.group("description")) or None
-    return code, description
+    # Remove the code and any separating dashes to retain the actual heading.
+    description = GL_CODE_PATTERN.sub("", text, count=1)
+    description = re.sub(r"(^\s*-\s*|\s*-\s*$)", "", description).strip()
+    return code, description or None
 
 
 def is_functional_unit(text: str) -> bool:
@@ -224,6 +237,40 @@ def _has_monthly_value(ws: Worksheet, row: int, month_columns: dict[str, int]) -
     return False
 
 
+def find_detail_gl_code(
+    ws: Worksheet,
+    row: int,
+    item_column: int,
+    description_column: int | None,
+    month_columns: dict[str, int],
+) -> str | None:
+    """Find the GL code assigned to one detail line.
+
+    Some sheets put the detail GL in the item text; others, including the
+    Grinder example, put it in the adjacent column.  Search non-month fields
+    on the current row and deliberately avoid the description column.
+    """
+    excluded_columns = set(month_columns.values())
+    if description_column is not None:
+        excluded_columns.add(description_column)
+
+    # Prefer the field next to the item, then any remaining non-month field.
+    ordered_columns = [item_column + 1, item_column]
+    ordered_columns.extend(
+        column
+        for column in range(1, ws.max_column + 1)
+        if column not in ordered_columns and column not in excluded_columns
+    )
+
+    for column in ordered_columns:
+        if column < 1 or column > ws.max_column or column in excluded_columns:
+            continue
+        code = find_gl_code(ws.cell(row, column).value)
+        if code:
+            return code
+    return None
+
+
 def extract_sheet_records(ws: Worksheet, sheet_name: str) -> list[dict[str, Any]]:
     """Extract normalized records from one expense worksheet."""
     header_row = find_header_row(ws)
@@ -238,17 +285,20 @@ def extract_sheet_records(ws: Worksheet, sheet_name: str) -> list[dict[str, Any]
     description_column = find_description_column(ws, header_row, month_columns)
 
     records: list[dict[str, Any]] = []
-    current_gl_code: str | None = None
-    current_gl_description: str | None = None
+    current_rollup_gl_code: str | None = None
+    current_rollup_gl_description: str | None = None
     current_function: str | None = None
 
     for row in range(header_row + 1, ws.max_row + 1):
         item_text = _clean_text(ws.cell(row, item_column).value)
 
         # GL and functional-unit rows establish context for the detail rows below.
-        gl_parts = parse_gl_header(item_text)
-        if gl_parts:
-            current_gl_code, current_gl_description = gl_parts
+        # A roll-up GL heading normally has no monthly values, for example:
+        # "GRINDERS - 7555-200".  Do not mistake a detail line's GL code for
+        # a new roll-up section.
+        rollup_gl = parse_rollup_gl_header(item_text)
+        if rollup_gl and not _has_monthly_value(ws, row, month_columns):
+            current_rollup_gl_code, current_rollup_gl_description = rollup_gl
             current_function = None
             continue
 
@@ -262,6 +312,13 @@ def extract_sheet_records(ws: Worksheet, sheet_name: str) -> list[dict[str, Any]
 
         # Retain a useful fallback item if a template uses column B for names.
         item = item_text or _clean_text(ws.cell(row, 2).value) or None
+        detail_gl_code = find_detail_gl_code(
+            ws,
+            row,
+            item_column,
+            description_column,
+            month_columns,
+        )
         description = (
             _is_real_description(ws.cell(row, description_column).value)
             if description_column is not None
@@ -276,8 +333,9 @@ def extract_sheet_records(ws: Worksheet, sheet_name: str) -> list[dict[str, Any]
             records.append(
                 {
                     "Expense Category": sheet_name,
-                    "GL Code": current_gl_code,
-                    "GL Description": current_gl_description,
+                    "Roll-up GL Code": current_rollup_gl_code,
+                    "Roll-up GL Description": current_rollup_gl_description,
+                    "Detail GL Code": detail_gl_code,
                     "Functional Unit": current_function,
                     "Item": item,
                     "Description": description,
@@ -308,8 +366,9 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
 
     columns = [
         "Expense Category",
-        "GL Code",
-        "GL Description",
+        "Roll-up GL Code",
+        "Roll-up GL Description",
+        "Detail GL Code",
         "Functional Unit",
         "Item",
         "Description",
