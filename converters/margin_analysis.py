@@ -261,7 +261,7 @@ def percent(
             "_overhead",
         ]
     )
-    def convert(uploaded_file: Any) -> pd.DataFrame:
+def convert(uploaded_file: Any) -> pd.DataFrame:
     """Return base-detail margin analysis data in long format.
 
     Derived report rows (totals, ratios, gross margin, differences, and
