@@ -131,30 +131,40 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
         how="left",
     )
 
-    # ---------------------------------------------------------
-    # 2. Territory totals by Section
-    # Used for:
-    # Plant Share of Territory Category %
-    # ---------------------------------------------------------
-    territory_totals = (
-        output.groupby(
-            ["Territory", "Section", "Period"],
-            as_index=False,
-        )["Amount"]
-        .sum()
-        .rename(columns={"Amount": "_territory_total"})
-    )
+# ---------------------------------------------------------
+# Territory totals by Category
+# Used for:
+# Plant Share of Territory Category %
+# ---------------------------------------------------------
+territory_totals = (
+    output.groupby(
+        [
+            "Territory",
+            "Section",
+            "Line Item",
+            "Period",
+        ],
+        as_index=False,
+    )["Amount"]
+    .sum()
+    .rename(columns={"Amount": "_territory_total"})
+)
 
-    output = output.merge(
-        territory_totals,
-        on=["Territory", "Section", "Period"],
-        how="left",
-    )
+output = output.merge(
+    territory_totals,
+    on=[
+        "Territory",
+        "Section",
+        "Line Item",
+        "Period",
+    ],
+    how="left",
+)
 
-    output["Plant Share of Territory Category %"] = percent(
-        output["Amount"],
-        output["_territory_total"],
-    )
+output["Plant Share of Territory Category %"] = percent(
+    output["Amount"],
+    output["_territory_total"],
+)
 
     # ---------------------------------------------------------
     # 3. Category % of Plant Sales
