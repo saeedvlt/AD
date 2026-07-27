@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from numbers import Number
+import re
 from typing import Any
 
 import pandas as pd
@@ -200,6 +201,34 @@ def row_has_monthly_data(
     return False
 
 
+def row_has_actual_amount(ws: Worksheet, row: int, month_columns: dict[str, int]) -> bool:
+    """Return True only when a row has at least one calculated non-zero month."""
+    return any(
+        as_amount(ws.cell(row, column).value) != 0
+        for column in month_columns.values()
+    )
+
+
+def is_calculated_summary_row(
+    formula_ws: Worksheet, row: int, month_columns: dict[str, int]
+) -> bool:
+    """Identify unlabeled calculated roll-ups such as ``=SUM(G21:G24)``."""
+    formulas = [
+        formula_ws.cell(row, column).value
+        for column in month_columns.values()
+        if formula_ws.cell(row, column).value is not None
+    ]
+    if not formulas or not all(isinstance(formula, str) and formula.startswith("=") for formula in formulas):
+        return False
+
+    # Covers both SUM formulas and simple direct additions used in some tabs.
+    return all(
+        formula.upper().startswith("=SUM(")
+        or bool(re.fullmatch(r"=[A-Z]+\d+(?:\+[A-Z]+\d+)+", formula.upper()))
+        for formula in formulas
+    )
+
+
 def convert(uploaded_file: Any) -> pd.DataFrame:
     """Convert an expense workbook into a Power BI-ready DataFrame.
 
@@ -246,11 +275,6 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             column_c = ws.cell(row, 3).value
             text = clean_text(column_a)
 
-            # Column A is the source item's identifier.  Blank-column-A rows
-            # are layout/formula rows and must never become output records.
-            if not text:
-                continue
-
             # Do this before setting context so Sub-total and Head Count labels
             # cannot overwrite a GL or functional unit for later detail rows.
             if is_summary_or_headcount_row(column_a, column_b, column_c):
@@ -262,6 +286,16 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                 row,
                 month_columns,
             )
+            has_actual_amount = row_has_actual_amount(ws, row, month_columns)
+
+            # Some valid details have no item/description but do have monthly
+            # amounts.  Keep those rows.  Empty layout rows are rejected, as
+            # are unlabeled calculated roll-ups such as =SUM(G21:G24).
+            if not text:
+                if not has_actual_amount:
+                    continue
+                if is_calculated_summary_row(formula_ws, row, month_columns):
+                    continue
 
             # Functional-unit headings must be checked before GL headings:
             # "Process Planning - DS" contains a dash but is a department,
