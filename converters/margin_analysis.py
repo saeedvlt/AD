@@ -308,6 +308,8 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
             "_plant_sales",
             "_territory_total",
             "_matching_sales",
+            "_annual_category_total",
+            "_plant_category_total",
         ]
     )
 def convert(uploaded_file: Any) -> pd.DataFrame:
@@ -409,7 +411,5 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
     if data.empty:
         return data
 
-    "_annual_category_total",
-    "_plant_category_total",
 
     return add_percentages(data)
