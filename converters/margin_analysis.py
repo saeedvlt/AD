@@ -109,7 +109,9 @@ def percent(
         numerator.div(denominator.where(denominator != 0))
         * 100
     ).round(2)
-    def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
+
+
+def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
     """Add all derived percentage calculations."""
 
     output = data.copy()
@@ -136,11 +138,10 @@ def percent(
     # Plant Share of Territory Category %
     # ---------------------------------------------------------
     territory_totals = (
-        output.groupby(
-            ["Territory", "Section", "Period"],
-            as_index=False,
-        )["Amount"]
-        .sum()
+output.groupby(
+    ["Territory", "Section", "Line Item", "Period"],
+    as_index=False,
+)["Amount"].sum()
         .rename(columns={"Amount": "_territory_total"})
     )
 
