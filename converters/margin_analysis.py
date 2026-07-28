@@ -101,6 +101,23 @@ def find_month_columns(ws: Worksheet) -> dict[int, datetime]:
     )
 
 
+def is_derived_line(label: str) -> bool:
+    """Exclude calculated totals, ratios, and reconciliation lines."""
+    normalized = label.casefold()
+
+    return (
+        normalized.startswith("total")
+        or normalized.startswith("per ")
+        or normalized.startswith("sales per")
+        or normalized == "diff"
+        or normalized.startswith("gross margin")
+        or normalized.endswith("%")
+        or " per gp" in normalized
+        or "financial statement" in normalized
+        or normalized in {"f/s", "fabs only", "plug"}
+    )
+
+
 def has_monthly_amount(
     ws: Worksheet,
     row: int,
@@ -117,8 +134,8 @@ def has_monthly_amount(
 def convert(uploaded_file: Any) -> pd.DataFrame:
     """Return base-detail margin analysis data in long format.
 
-    Derived report rows (totals, ratios, gross margin, differences, and
-    ``Adjust to Actual``) are intentionally excluded to prevent double-counting.
+    Derived report rows (totals, ratios, gross margin, differences, etc.)
+    are excluded. "Adjust to Actual" rows are retained and labeled for reporting.
     Manual adjustment lines, such as ``Adjust: Rebates``, are retained.
     """
 
@@ -156,11 +173,6 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             # Detect section headers
             if normalized_label in SECTION_NAMES:
                 current_section = SECTION_NAMES[normalized_label]
-                continue
-
-            # Skip totals and calculated rows
-            if is_derived_line(label):
-                previous_label = label
                 continue
 
             # Ignore Gross Margin section
@@ -214,8 +226,8 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                 
                 if adjustment_target == label:
                     adjustment_target = None
-                
-                previous_label = label
+
+            previous_label = label
     columns = [
         "Location",
         "Territory",
