@@ -57,14 +57,20 @@ def adjusted_line_item(
     line_item: str,
     pending_adjustment: str | None,
 ) -> str:
-    """Return the reporting line item."""
-    if pending_adjustment is None:
+    """Return a unique reporting name."""
+
+    if pending_adjustment == "__WAITING__":
         return line_item
 
-    if line_item == pending_adjustment:
-        return f"Adjusted {line_item}"
+    if pending_adjustment is not None:
+        if line_item == "Adjust to Actual":
+            return f"Adjust to Actual - {pending_adjustment}"
+
+        if line_item == pending_adjustment:
+            return f"Adjusted {line_item}"
 
     return line_item
+
 
 def budget_category(line_item: str) -> str:
     """Return the budget category for a line item."""
@@ -109,7 +115,6 @@ def is_derived_line(label: str) -> bool:
         or normalized.startswith("per ")
         or normalized.startswith("sales per")
         or normalized == "diff"
-        or normalized.startswith("adjust to actual")
         or normalized.startswith("gross margin")
         or normalized.endswith("%")
         or " per gp" in normalized
@@ -178,6 +183,8 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
         for row in range(1, ws.max_row + 1):
 
             label = clean_text(ws.cell(row, 1).value)
+            if pending_adjustment == "__WAITING__":
+                pending_adjustment = label
             normalized_label = label.casefold()
 
             # Detect section headers
@@ -196,7 +203,6 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             # Detect Adjust to Actual rows
             if normalized_label == "adjust to actual":
                 pending_adjustment = "__WAITING__"
-                continue
             
             # Skip totals and other derived rows
             if is_derived_line(label):
@@ -224,6 +230,11 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                     else 0.0
                 )
 
+                reporting_name = adjusted_line_item(
+                    label,
+                    pending_adjustment,
+                )
+                
                 records.append(
                     {
                         "Location": location,
@@ -231,16 +242,13 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                         "Section": current_section,
                         "Budget Category": budget_category(label),
                         "Line Item": label,
-                        "Adjusted Line Item": adjusted_line_item(
-                            label,
-                            pending_adjustment,
-                        ),
-                        "Adjusted Line Item": adjusted_line_item
-                        "Period": period,
+                        "Adjusted Line Item": reporting_name,
+                        "Period": period,                        
                         "Month": period.strftime("%m - %b"),
                         "Amount": amount,
                     }
                 )
+                
                 if pending_adjustment == label:
                     pending_adjustment = None
     columns = [
@@ -249,6 +257,7 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
         "Section",
         "Budget Category",
         "Line Item",
+        "Adjusted Line Item",
         "Period",
         "Month",
         "Amount",
