@@ -1,69 +1,57 @@
+Based on the workbook structure, use the following logic:
 
-# Replace the material adjustment logic with the following inside convert(),
-# before the row loop:
+1.  Remove:
 
-pending_adjustment = {}
+    -   percent()
+    -   add_percentages()
+    -   return add_percentages(data)
 
-# ------------------------------------------------------------------
-# Inside the row loop, immediately after:
-# label = clean_text(...)
-# normalized_label = label.casefold()
-# ------------------------------------------------------------------
+    Replace with: return data
 
-adjustment_status = "Standard"
+2.  Add a new column: “Adjustment Status”
 
-if current_section == "Material":
+3.  Material logic
 
-    # Adjustment row
-    if normalized_label == "adjust to actual":
-        adjustment_status = "Adjustment"
+Before looping rows:
 
-        # remember the previous material item
-        if previous_material in ("Fabrications", "Customer Material"):
-            pending_adjustment[previous_material] = True
+    material_seen = {}
 
-    elif label in ("Fabrications", "Customer Material"):
+Inside the row loop, after determining current_section and before
+appending records:
 
-        if pending_adjustment.get(label, False):
-            adjustment_status = "Net"
-            pending_adjustment[label] = False
-        else:
-            adjustment_status = "Original"
+    status = "Standard"
 
-        previous_material = label
+    if current_section == "Material":
+        if label == "Adjust to Actual":
+            status = "Adjustment"
+        elif label in BUDGET_CATEGORIES or label in (
+            "Die Sets",
+            "Cast Die Sets",
+            "Stght Fwd Die Sets",
+            "Machined Steel",
+            "Bolster Plates",
+            "Ground Steel",
+            "Rough Steel",
+            "Fabrications",
+            "Components",
+            "Customer Material",
+        ):
+            material_seen[label] = material_seen.get(label, 0) + 1
+            status = "Original" if material_seen[label] == 1 else "Net"
 
-# For every other Material row remember the label
-elif current_section == "Material":
-    previous_material = label
+    elif current_section in ("Labour", "Overhead"):
+        status = "Adjustment" if label == "Adjust to Actual" else "Standard"
 
+4.  Include in each record:
 
-# ------------------------------------------------------------------
-# Before the row loop initialize:
-# ------------------------------------------------------------------
+    “Adjustment Status”: status,
 
-previous_material = None
-pending_adjustment = {
-    "Fabrications": False,
-    "Customer Material": False,
-}
+5.  Add “Adjustment Status” to the columns list.
 
-# ------------------------------------------------------------------
-# In records.append(...)
-# ------------------------------------------------------------------
+This matches the workbook layout: Original rows Adjust to Actual Net
+rows
 
-"Adjustment Status": adjustment_status,
+for: - Die Sets - Plate - Fabrications - Customer Material
 
-# ------------------------------------------------------------------
-# IMPORTANT
-# ------------------------------------------------------------------
-# Remove this line from is_derived_line():
-#
-# or normalized.startswith("adjust to actual")
-#
-# and return:
-#
-# return data
-#
-# instead of:
-#
-# return add_percentages(data)
+Labour and Overhead keep the Adjust to Actual rows tagged as
+“Adjustment”.
