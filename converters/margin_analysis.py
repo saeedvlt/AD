@@ -101,23 +101,6 @@ def find_month_columns(ws: Worksheet) -> dict[int, datetime]:
     )
 
 
-def is_derived_line(label: str) -> bool:
-    """Exclude calculated totals, ratios, and reconciliation lines."""
-    normalized = label.casefold()
-
-    return (
-        normalized.startswith("total")
-        or normalized.startswith("per ")
-        or normalized.startswith("sales per")
-        or normalized == "diff"
-        or normalized.startswith("gross margin")
-        or normalized.endswith("%")
-        or " per gp" in normalized
-        or "financial statement" in normalized
-        or normalized in {"f/s", "fabs only", "plug"}
-    )
-
-
 def has_monthly_amount(
     ws: Worksheet,
     row: int,
@@ -175,6 +158,11 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                 current_section = SECTION_NAMES[normalized_label]
                 continue
 
+            # Skip totals and calculated rows
+            if is_derived_line(label):
+                previous_label = label
+                continue
+
             # Ignore Gross Margin section
             if current_section == "Gross Margin":
                 continue
@@ -226,6 +214,8 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                 
                 if adjustment_target == label:
                     adjustment_target = None
+                
+                previous_label = label
     columns = [
         "Location",
         "Territory",
