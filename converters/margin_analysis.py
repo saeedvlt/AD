@@ -170,12 +170,12 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
         .rename(columns={"Amount": "_territory_total"})
     )
 
-    output = output.merge(
+     output = output.merge(
         territory_totals,
         on=[
             "Territory",
             "Section",
-            "Line Item",
+            "Budget Category",
             "Period",
         ],
         how="left",
