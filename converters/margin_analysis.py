@@ -161,7 +161,7 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
             [
                 "Territory",
                 "Section",
-                "Line Item",
+                "Budget Category",
                 "Period",
             ],
             as_index=False,
