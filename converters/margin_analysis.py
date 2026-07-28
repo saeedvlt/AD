@@ -20,7 +20,7 @@ LOCATIONS = ("Windsor", "Cambridge", "Montreal", "Ithaca")
 TERRITORIES = {
     "Windsor": "CDN",
     "Cambridge": "CDN",
-    "Montreal": "CDN",
+    "Montreal": "MONTREAL",
     "Ithaca": "US",
 }
 
