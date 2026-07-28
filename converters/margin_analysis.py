@@ -55,22 +55,16 @@ def clean_text(value: Any) -> str:
     
 def adjusted_line_item(
     line_item: str,
-    pending_adjustment: str | None,
+    previous_item: str | None,
 ) -> str:
-    """Return a unique reporting name."""
+    if line_item == "Adjust to Actual":
+        return f"Adjust to Actual - {previous_item}"
 
-    if pending_adjustment == "__WAITING__":
-        return line_item
-
-    if pending_adjustment is not None:
-        if line_item == "Adjust to Actual":
-            return f"Adjust to Actual - {pending_adjustment}"
-
-        if line_item == pending_adjustment:
-            return f"Adjusted {line_item}"
+    if previous_item is not None:
+        return f"Adjusted {line_item}"
 
     return line_item
-
+    
 
 def budget_category(line_item: str) -> str:
     """Return the budget category for a line item."""
@@ -179,6 +173,9 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
 
         current_section: str | None = None
         pending_adjustment: str | None = None
+        if pending_adjustment == "__WAITING__":
+        return line_item
+        previous_label: str | None = None
 
         for row in range(1, ws.max_row + 1):
 
@@ -200,18 +197,10 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             if not label or current_section is None:
                 continue
             
-            # Detect Adjust to Actual rows
+            # Detect the adjustment row
             if normalized_label == "adjust to actual":
-                pending_adjustment = "__WAITING__"
-            
-            # Skip totals and other derived rows
-            if is_derived_line(label):
-                continue
-            
-            # First row after Adjust to Actual
-            if pending_adjustment == "__WAITING__":
-                pending_adjustment = label
-            
+                pending_adjustment = previous_label
+    
             if not has_monthly_amount(
                 ws,
                 row,
