@@ -231,30 +231,29 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
             [
                 "Territory",
                 "Section",
-                "Line Item",
+                "Budget Category",
             ],
             as_index=False,
         )["Amount"]
         .sum()
         .rename(columns={"Amount": "_annual_category_total"})
     )
-
+    
     output = output.merge(
         annual_category,
         on=[
             "Territory",
             "Section",
-            "Line Item",
+            "Budget Category",
         ],
         how="left",
     )
-
     plant_category = (
         output.groupby(
             [
                 "Location",
                 "Section",
-                "Line Item",
+                "Budget Category",
             ],
             as_index=False,
         )["Amount"]
@@ -267,11 +266,10 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
         on=[
             "Location",
             "Section",
-            "Line Item",
+            "Budget Category",
         ],
         how="left",
     )
-
     # ---------------------------------------------------------
     # Initialize columns
     # ---------------------------------------------------------
