@@ -52,7 +52,19 @@ BUDGET_CATEGORIES = {
 def clean_text(value: Any) -> str:
     """Return safely trimmed text for a worksheet value."""
     return "" if value is None else str(value).strip()
+    
+def adjusted_line_item(
+    line_item: str,
+    pending_adjustment: str | None,
+) -> str:
+    """Return the reporting line item."""
+    if pending_adjustment is None:
+        return line_item
 
+    if line_item == pending_adjustment:
+        return f"Adjusted {line_item}"
+
+    return line_item
 
 def budget_category(line_item: str) -> str:
     """Return the budget category for a line item."""
@@ -161,6 +173,7 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
         month_columns = find_month_columns(ws)
 
         current_section: str | None = None
+        pending_adjustment: str | None = None
 
         for row in range(1, ws.max_row + 1):
 
@@ -176,14 +189,23 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             if current_section == "Gross Margin":
                 continue
 
-            # Skip blanks and calculated rows
-            if (
-                not label
-                or current_section is None
-                or is_derived_line(label)
-            ):
+           # Skip blanks
+            if not label or current_section is None:
                 continue
-
+            
+            # Detect Adjust to Actual rows
+            if normalized_label == "adjust to actual":
+                pending_adjustment = "__WAITING__"
+                continue
+            
+            # Skip totals and other derived rows
+            if is_derived_line(label):
+                continue
+            
+            # First row after Adjust to Actual
+            if pending_adjustment == "__WAITING__":
+                pending_adjustment = label
+            
             if not has_monthly_amount(
                 ws,
                 row,
@@ -209,11 +231,18 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                         "Section": current_section,
                         "Budget Category": budget_category(label),
                         "Line Item": label,
+                        "Adjusted Line Item": adjusted_line_item(
+                            label,
+                            pending_adjustment,
+                        ),
+                        "Adjusted Line Item": adjusted_line_item
                         "Period": period,
                         "Month": period.strftime("%m - %b"),
                         "Amount": amount,
                     }
                 )
+                if pending_adjustment == label:
+                    pending_adjustment = None
     columns = [
         "Location",
         "Territory",
