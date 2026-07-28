@@ -55,17 +55,18 @@ def clean_text(value: Any) -> str:
     
 def adjusted_line_item(
     line_item: str,
-    previous_item: str | None,
+    adjustment_target: str | None,
 ) -> str:
-    if line_item == "Adjust to Actual":
-        return f"Adjust to Actual - {previous_item}"
+    """Return a reporting-friendly line item."""
 
-    if previous_item is not None:
+    if line_item == "Adjust to Actual" and adjustment_target:
+        return f"Adjust to Actual - {adjustment_target}"
+
+    if adjustment_target and line_item == adjustment_target:
         return f"Adjusted {line_item}"
 
     return line_item
     
-
 def budget_category(line_item: str) -> str:
     """Return the budget category for a line item."""
     return BUDGET_CATEGORIES.get(line_item, line_item)
@@ -130,17 +131,6 @@ def has_monthly_amount(
     )
 
 
-def percent(
-    numerator: pd.Series,
-    denominator: pd.Series,
-) -> pd.Series:
-    """Return percentages on a 0–100 scale."""
-    return (
-        numerator.div(denominator.where(denominator != 0))
-        * 100
-    ).round(2)
-
-
 def convert(uploaded_file: Any) -> pd.DataFrame:
     """Return base-detail margin analysis data in long format.
 
@@ -172,16 +162,12 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
         month_columns = find_month_columns(ws)
 
         current_section: str | None = None
-        pending_adjustment: str | None = None
-        if pending_adjustment == "__WAITING__":
-        return line_item
+        adjustment_target: str | None = None
         previous_label: str | None = None
 
         for row in range(1, ws.max_row + 1):
 
             label = clean_text(ws.cell(row, 1).value)
-            if pending_adjustment == "__WAITING__":
-                pending_adjustment = label
             normalized_label = label.casefold()
 
             # Detect section headers
@@ -199,7 +185,7 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
             
             # Detect the adjustment row
             if normalized_label == "adjust to actual":
-                pending_adjustment = previous_label
+                adjustment_target = previous_label
     
             if not has_monthly_amount(
                 ws,
@@ -221,7 +207,7 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
 
                 reporting_name = adjusted_line_item(
                     label,
-                    pending_adjustment,
+                    adjustment_target,
                 )
                 
                 records.append(
@@ -238,8 +224,8 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                     }
                 )
                 
-                if pending_adjustment == label:
-                    pending_adjustment = None
+                if adjustment_target == label:
+                    adjustment_target = None
     columns = [
         "Location",
         "Territory",
