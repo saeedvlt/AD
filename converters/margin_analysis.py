@@ -32,12 +32,31 @@ SECTION_NAMES = {
     "overhead": "Overhead",
     "gross margin": "Gross Margin",
 }
+BUDGET_CATEGORIES = {
+    "Die Sets": "Die Sets",
+    "Cast Die Sets": "Die Sets",
+    "Stght Fwd Die Sets": "Die Sets",
 
+    "Ground Steel": "Plate - Ground / Rough",
+    "Rough Steel": "Plate - Ground / Rough",
+
+    "Machined Steel": "Plate - Machined",
+    "Bolster Plates": "Plate - Machined",
+    "Customer Material": "Plate - Machined",
+
+    "Fabrications": "Fabs",
+
+    "Components": "Components",
+}
 
 def clean_text(value: Any) -> str:
     """Return safely trimmed text for a worksheet value."""
     return "" if value is None else str(value).strip()
 
+
+def budget_category(line_item: str) -> str:
+    """Return the budget category for a line item."""
+    return BUDGET_CATEGORIES.get(line_item, line_item)
 
 def is_number(value: Any) -> bool:
     """True for spreadsheet numeric values, excluding booleans."""
@@ -389,17 +408,18 @@ def convert(uploaded_file: Any) -> pd.DataFrame:
                         "Location": location,
                         "Territory": TERRITORIES[location],
                         "Section": current_section,
+                        "Budget Category": budget_category(label),
                         "Line Item": label,
                         "Period": period,
                         "Month": period.strftime("%m - %b"),
                         "Amount": amount,
                     }
                 )
-
     columns = [
         "Location",
         "Territory",
         "Section",
+        "Budget Category",
         "Line Item",
         "Period",
         "Month",
