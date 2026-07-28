@@ -146,7 +146,6 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
         .sum()
         .rename(columns={"Amount": "_plant_sales"})
     )
-
     output = output.merge(
         plant_sales,
         on=["Location", "Period"],
@@ -170,7 +169,7 @@ def add_percentages(data: pd.DataFrame) -> pd.DataFrame:
         .rename(columns={"Amount": "_territory_total"})
     )
 
-     output = output.merge(
+    output = output.merge(
         territory_totals,
         on=[
             "Territory",
