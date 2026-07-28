@@ -45,7 +45,7 @@ BUDGET_CATEGORIES = {
     "Customer Material": "Plate - Machined",
 
     "Fabrications": "Fabs",
-
+    "Springs": "Components",
     "Components": "Components",
 }
 
