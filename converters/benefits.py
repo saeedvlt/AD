@@ -100,8 +100,8 @@ def append_manulife(df, wb):
 
     for _, emp in employee_months.iterrows():
 
-        site = emp["Site Location"]
-
+        site = str(emp["Site Location"]).strip()
+        
         if site not in lookup:
             continue
 
