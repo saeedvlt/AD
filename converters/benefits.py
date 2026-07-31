@@ -63,21 +63,77 @@ def append_manulife(df, wb):
     # !!! CHANGE THESE CELL REFERENCES TO MATCH YOUR YELLOW BOX !!!
     # ------------------------------------------------------------------
 
-    lookup = {
-        "Windsor": {
-            "Manu": ws["K11"].value,
-            "Insurance": ws["L11"].value,
-        },
-        "Cambridge": {
-            "Manu": ws["K12"].value,
-            "Insurance": ws["L12"].value,
-        },
-        "Montreal": {
-            "Manu": ws["K14"].value,
-            "Insurance": ws["L14"].value,
-        },
-    }
+    # Find the header row that contains "Manu"
 
+    header_row = None
+    
+    for r in range(1, ws.max_row + 1):
+        values = [
+            str(ws.cell(r, c).value).strip() if ws.cell(r, c).value else ""
+            for c in range(1, ws.max_column + 1)
+        ]
+    
+        if "Manu" in values:
+            header_row = r
+            break
+    
+    if header_row is None:
+        raise ValueError("Could not locate Manu header in 'Manulife Ins Costs'.")
+    
+    headers = {}
+    
+    for c in range(1, ws.max_column + 1):
+        value = ws.cell(header_row, c).value
+    
+        if value is not None:
+            headers[str(value).strip()] = c
+    
+    # ---------------------------------------------------------
+    # Locate the yellow summary table automatically
+    # ---------------------------------------------------------
+    
+    manu_col = None
+    header_row = None
+    
+    for r in range(1, ws.max_row + 1):
+        for c in range(1, ws.max_column + 1):
+    
+            value = ws.cell(r, c).value
+    
+            if str(value).strip() == "Manu":
+                header_row = r
+                manu_col = c
+                break
+    
+        if manu_col:
+            break
+    
+    if manu_col is None:
+        raise ValueError("Could not find the 'Manu' header.")
+    
+    insurance_col = manu_col + 1
+    site_col = manu_col - 1
+    
+    lookup = {}
+    
+    r = header_row + 1
+    
+    while True:
+    
+        site = ws.cell(r, site_col).value
+    
+        if site in (None, ""):
+            break
+    
+        site = str(site).strip()
+    
+        lookup[site] = {
+            "Manu": ws.cell(r, manu_col).value,
+            "Insurance": ws.cell(r, insurance_col).value,
+        }
+    
+        r += 1
+        print(lookup)
     # ------------------------------------------------------------------
     # Unique employee/month combinations
     # ------------------------------------------------------------------
@@ -105,15 +161,14 @@ def append_manulife(df, wb):
         if site not in lookup:
             continue
 
-        for benefit in ("Manu", "Insurance"):
+        for benefit, amount in lookup[site].items():
 
             row = emp.to_dict()
-
+        
             row["Benefit"] = benefit
-            row["Amount"] = lookup[site][benefit]
-
+            row["Amount"] = amount
+        
             new_rows.append(row)
-
     if new_rows:
 
         df = pd.concat(
