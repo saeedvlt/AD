@@ -3,8 +3,9 @@ sheet. "
 import pandas as pd 
 import streamlit as st
 
-def convert(input_file): sheet = "Salaries - Head Count Summary"
-
+def convert(input_file):
+    sheet = "Salaries - Head Count Summary"
+    
     # Locate header row dynamically
     preview = pd.read_excel(input_file, sheet_name=sheet, header=None)
 
@@ -52,11 +53,9 @@ def convert(input_file): sheet = "Salaries - Head Count Summary"
 
     return long_df
 
-————————————————–
-
-Standalone Streamlit page (optional)
-
-————————————————–
+# ————————————————–
+#Standalone Streamlit page (optional)
+# ————————————————–
 
 def app(): st.title("Labour Summary Unpivot")
 
@@ -88,24 +87,5 @@ def app(): st.title("Labour Summary Unpivot")
             st.error(str(e))
 
 if __name__ == "__main__":
-————————————————–
-
-Main Streamlit app integration
-
-————————————————–
-
-In your main app.py:
-
-from converters.labour_summary import convert as labour_summary_convert
-
-converters = {
-
-"Labour Summary": labour_summary_convert,
-
-}
-
-Then call:
-
-output_df = labour_summary_convert(uploaded_file)
-
-exactly the same way as your other converters.
+    app()
+    
