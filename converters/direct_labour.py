@@ -87,8 +87,7 @@ def app(): st.title(“Labour Summary Unpivot”)
         except Exception as e:
             st.error(str(e))
 
-if name == “main”: app()
-
+if __name__ == "__main__":
 ————————————————–
 
 Main Streamlit app integration
