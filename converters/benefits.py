@@ -48,6 +48,83 @@ def split_name(name):
 
     return name, ""
 
+def append_manulife(df, wb):
+    """
+    Read the yellow summary box from the 'Manulife Ins Costs' worksheet
+    and append Manu / Insurance records for every employee-month.
+    """
+
+    if "Manulife Ins Costs" not in wb.sheetnames:
+        return df
+
+    ws = wb["Manulife Ins Costs"]
+
+    # ------------------------------------------------------------------
+    # !!! CHANGE THESE CELL REFERENCES TO MATCH YOUR YELLOW BOX !!!
+    # ------------------------------------------------------------------
+
+    lookup = {
+        "Windsor": {
+            "Manu": ws["K11"].value,
+            "Insurance": ws["L11"].value,
+        },
+        "Cambridge": {
+            "Manu": ws["K12"].value,
+            "Insurance": ws["L12"].value,
+        },
+        "Montreal": {
+            "Manu": ws["K14"].value,
+            "Insurance": ws["L14"].value,
+        },
+    }
+
+    # ------------------------------------------------------------------
+    # Unique employee/month combinations
+    # ------------------------------------------------------------------
+
+    employee_months = df[
+        [
+            "Emp #",
+            "Name",
+            "Last Name",
+            "First Name",
+            "Employee Code",
+            "Date of Hire",
+            "Site Location",
+            "AOP File Assignment",
+            "Month",
+        ]
+    ].drop_duplicates()
+
+    new_rows = []
+
+    for _, emp in employee_months.iterrows():
+
+        site = emp["Site Location"]
+
+        if site not in lookup:
+            continue
+
+        for benefit in ("Manu", "Insurance"):
+
+            row = emp.to_dict()
+
+            row["Benefit"] = benefit
+            row["Amount"] = lookup[site][benefit]
+
+            new_rows.append(row)
+
+    if new_rows:
+
+        df = pd.concat(
+            [
+                df,
+                pd.DataFrame(new_rows),
+            ],
+            ignore_index=True,
+        )
+
+    return df
 
 def convert(uploaded_file):
 
@@ -172,5 +249,6 @@ def convert(uploaded_file):
 
     df = df[cols]
 
-    return df
+    df = append_manulife(df, wb)
     
+    return df    
