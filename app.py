@@ -5,7 +5,7 @@ from converters.benefits import convert as benefits_convert
 from converters.expense import convert as expense_convert
 from converters.margin_analysis import convert as margin_analysis_convert
 from converters.sales import convert as sales_convert
-from converters.windsor_dl import convert as windsor_dl_convert
+from converters.direct_labour import convert as direct_labour_convert
 
 
 st.set_page_config(
@@ -30,7 +30,7 @@ CONVERTERS = {
     "Benefits Template": (benefits_convert, "Benefits Database.xlsx"),
     "Sales Template": (sales_convert, "Sales Database.xlsx"),
     "Margin Analysis": (margin_analysis_convert, "Margin Analysis Database.xlsx"),
-    "Windor DL": (Windsor_DL_convert, "Direct Labour Database.xlsx"),
+    "Direct Labour": (direct_labour_convert, "Direct Labour Database.xlsx"),
 
 }
 
@@ -39,7 +39,7 @@ UPLOAD_LABELS = {
     "Benefits Template": "Upload Benefits Template Workbook",
     "Sales Template": "Upload Sales Template Workbook",
     "Margin Analysis": "Upload Margin Analysis Workbook",
-    "Windsor DL": "Upload Direct Labour Workbook",
+    "Direct Labour": "Upload Direct Labour Workbook",
 }
 
 converter = st.selectbox("Choose a converter", list(CONVERTERS))
