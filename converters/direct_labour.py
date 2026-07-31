@@ -1,7 +1,7 @@
-" labour_summary.py Converter for the "Salaries - Head Count Summary"
-sheet. "
+#" labour_summary.py Converter for the "Salaries - Head Count Summary" sheet. "
+
+
 import pandas as pd 
-import streamlit as st
 
 def convert(input_file):
     sheet = "Salaries - Head Count Summary"
@@ -53,39 +53,3 @@ def convert(input_file):
 
     return long_df
 
-# ————————————————–
-#Standalone Streamlit page (optional)
-# ————————————————–
-
-def app(): st.title("Labour Summary Unpivot")
-
-    uploaded_file = st.file_uploader(
-        "Upload Budget Workbook",
-        type=["xlsx"]
-    )
-
-    if uploaded_file is not None:
-        try:
-            result = convert(uploaded_file)
-
-            st.success("Conversion completed!")
-            st.dataframe(result)
-
-            output = "LabourSummary_Unpivot.xlsx"
-            with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                result.to_excel(writer, index=False)
-
-            with open(output, "rb") as f:
-                st.download_button(
-                    "Download Excel",
-                    data=f,
-                    file_name=output,
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-        except Exception as e:
-            st.error(str(e))
-
-if __name__ == "__main__":
-    app()
-    
