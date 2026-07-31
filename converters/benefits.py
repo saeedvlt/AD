@@ -62,31 +62,6 @@ def append_manulife(df, wb):
     # ------------------------------------------------------------------
     # !!! CHANGE THESE CELL REFERENCES TO MATCH YOUR YELLOW BOX !!!
     # ------------------------------------------------------------------
-
-    # Find the header row that contains "Manu"
-
-    header_row = None
-    
-    for r in range(1, ws.max_row + 1):
-        values = [
-            str(ws.cell(r, c).value).strip() if ws.cell(r, c).value else ""
-            for c in range(1, ws.max_column + 1)
-        ]
-    
-        if "Manu" in values:
-            header_row = r
-            break
-    
-    if header_row is None:
-        raise ValueError("Could not locate Manu header in 'Manulife Ins Costs'.")
-    
-    headers = {}
-    
-    for c in range(1, ws.max_column + 1):
-        value = ws.cell(header_row, c).value
-    
-        if value is not None:
-            headers[str(value).strip()] = c
     
     # ---------------------------------------------------------
     # Locate the yellow summary table automatically
@@ -133,7 +108,8 @@ def append_manulife(df, wb):
         }
     
         r += 1
-        print(lookup)
+        
+    print(lookup)
     # ------------------------------------------------------------------
     # Unique employee/month combinations
     # ------------------------------------------------------------------
