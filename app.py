@@ -5,7 +5,7 @@ from converters.benefits import convert as benefits_convert
 from converters.expense import convert as expense_convert
 from converters.margin_analysis import convert as margin_analysis_convert
 from converters.sales import convert as sales_convert
-from converters.Windsor_DL import convert as Windsor_DL_convert
+from converters.windsor_dl import convert as windsor_dl_convert
 
 
 st.set_page_config(
