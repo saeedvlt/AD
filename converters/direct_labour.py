@@ -1,55 +1,95 @@
-#" labour_summary.py Converter for the "Salaries - Head Count Summary" sheet. "
+import pandas as pd
 
-
-import pandas as pd 
-
-def convert(input_file):
-    sheet = "Labour Summary"
+def convert(input_file): 
     
-    # Locate header row dynamically
-    preview = pd.read_excel(input_file, sheet_name=sheet, header=None)
+    """ Converts the Labour Summary’ sheet into a normalized database.
 
-    header_row = None
-    for i, row in preview.iterrows():
-        if "Line Item" in row.astype(str).str.strip().tolist():
-            header_row = i
+    "Output columns:
+        Section
+        Department
+        Month
+        Value """
+
+    SHEET = "Labour Summary"
+    MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+              "Jul","Aug","Sep","Oct","Nov","Dec"]
+
+    raw = pd.read_excel(input_file, sheet_name=SHEET, header=None)
+
+    # ----------------------------------------------------
+    # Locate the month header row dynamically
+    # ----------------------------------------------------
+    month_row = None
+
+    for i, row in raw.iterrows():
+        vals = [str(v).strip() for v in row.tolist()]
+        if {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"}.issubset(set(vals)):
+            month_row = i
             break
 
-    if header_row is None:
-        raise ValueError("Could not locate 'Line Item'.")
+    if month_row is None:
+        raise ValueError("Unable to locate month header row.")
 
-    df = pd.read_excel(
-        input_file,
-        sheet_name=sheet,
-        header=header_row
+    month_cols = {}
+
+    for c in raw.columns:
+        val = str(raw.iloc[month_row, c]).strip()
+        if val in MONTHS:
+            month_cols[c] = val
+
+    records = []
+
+    current_section = None
+
+    skip_words = (
+        "total",
+        "grand total",
+        "actual",
+        "budget",
+        "variance"
     )
 
-    df = df.rename(columns={df.columns[0]: "Line Item"})
-    df = df[df["Line Item"].notna()]
-    df = df.dropna(axis=1, how="all")
-    df = df.loc[:, ~df.columns.astype(str).str.startswith("Unnamed")]
+    for r in range(month_row + 1, len(raw)):
 
-    # Stop before Headcount total
-    stop = df[df["Line Item"].astype(str).str.strip().eq("Headcount")]
-    if not stop.empty:
-        df = df.iloc[:stop.index[0]]
+        first = raw.iloc[r, 0]
 
-    long_df = df.melt(
-        id_vars=["Line Item"],
-        var_name="Metric",
-        value_name="Value"
-    )
+        if pd.isna(first):
+            continue
 
-    long_df = long_df.dropna(subset=["Value"])
+        first = str(first).strip()
 
-    months = [
-        "Jan","Feb","Mar","Apr","May","Jun",
-        "Jul","Aug","Sep","Oct","Nov","Dec"
-    ]
+        if first == "":
+            continue
 
-    long_df["Month"] = long_df["Metric"].apply(
-        lambda x: x if x in months else "Overall"
-    )
+        # Section headers
+        if first.endswith(":"):
+            current_section = first[:-1].strip()
+            continue
 
-    return long_df
+        if current_section is None:
+            continue
 
+        lower = first.lower()
+
+        if any(word in lower for word in skip_words):
+            continue
+
+        department = first
+
+        for col, month in month_cols.items():
+
+            value = raw.iloc[r, col]
+
+            if pd.isna(value):
+                continue
+
+            records.append({
+                "Section": current_section,
+                "Department": department,
+                "Month": month,
+                "Value": value
+            })
+
+    df = pd.DataFrame(records)
+
+    return df
