@@ -1,9 +1,9 @@
-““” labour_summary.py Converter for the “Salaries - Head Count Summary”
-sheet. ““”
+" labour_summary.py Converter for the "Salaries - Head Count Summary"
+sheet. "
+import pandas as pd 
+import streamlit as st
 
-import pandas as pd import streamlit as st
-
-def convert(input_file): sheet = “Salaries - Head Count Summary”
+def convert(input_file): sheet = "Salaries - Head Count Summary"
 
     # Locate header row dynamically
     preview = pd.read_excel(input_file, sheet_name=sheet, header=None)
@@ -58,7 +58,7 @@ Standalone Streamlit page (optional)
 
 ————————————————–
 
-def app(): st.title(“Labour Summary Unpivot”)
+def app(): st.title("Labour Summary Unpivot")
 
     uploaded_file = st.file_uploader(
         "Upload Budget Workbook",
@@ -100,7 +100,7 @@ from converters.labour_summary import convert as labour_summary_convert
 
 converters = {
 
-“Labour Summary”: labour_summary_convert,
+"Labour Summary": labour_summary_convert,
 
 }
 
