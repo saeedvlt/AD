@@ -1,0 +1,112 @@
+““” labour_summary.py Converter for the “Salaries - Head Count Summary”
+sheet. ““”
+
+import pandas as pd import streamlit as st
+
+def convert(input_file): sheet = “Salaries - Head Count Summary”
+
+    # Locate header row dynamically
+    preview = pd.read_excel(input_file, sheet_name=sheet, header=None)
+
+    header_row = None
+    for i, row in preview.iterrows():
+        if "Line Item" in row.astype(str).str.strip().tolist():
+            header_row = i
+            break
+
+    if header_row is None:
+        raise ValueError("Could not locate 'Line Item'.")
+
+    df = pd.read_excel(
+        input_file,
+        sheet_name=sheet,
+        header=header_row
+    )
+
+    df = df.rename(columns={df.columns[0]: "Line Item"})
+    df = df[df["Line Item"].notna()]
+    df = df.dropna(axis=1, how="all")
+    df = df.loc[:, ~df.columns.astype(str).str.startswith("Unnamed")]
+
+    # Stop before Headcount total
+    stop = df[df["Line Item"].astype(str).str.strip().eq("Headcount")]
+    if not stop.empty:
+        df = df.iloc[:stop.index[0]]
+
+    long_df = df.melt(
+        id_vars=["Line Item"],
+        var_name="Metric",
+        value_name="Value"
+    )
+
+    long_df = long_df.dropna(subset=["Value"])
+
+    months = [
+        "Jan","Feb","Mar","Apr","May","Jun",
+        "Jul","Aug","Sep","Oct","Nov","Dec"
+    ]
+
+    long_df["Month"] = long_df["Metric"].apply(
+        lambda x: x if x in months else "Overall"
+    )
+
+    return long_df
+
+————————————————–
+
+Standalone Streamlit page (optional)
+
+————————————————–
+
+def app(): st.title(“Labour Summary Unpivot”)
+
+    uploaded_file = st.file_uploader(
+        "Upload Budget Workbook",
+        type=["xlsx"]
+    )
+
+    if uploaded_file is not None:
+        try:
+            result = convert(uploaded_file)
+
+            st.success("Conversion completed!")
+            st.dataframe(result)
+
+            output = "LabourSummary_Unpivot.xlsx"
+            with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                result.to_excel(writer, index=False)
+
+            with open(output, "rb") as f:
+                st.download_button(
+                    "Download Excel",
+                    data=f,
+                    file_name=output,
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
+
+        except Exception as e:
+            st.error(str(e))
+
+if name == “main”: app()
+
+————————————————–
+
+Main Streamlit app integration
+
+————————————————–
+
+In your main app.py:
+
+from converters.labour_summary import convert as labour_summary_convert
+
+converters = {
+
+“Labour Summary”: labour_summary_convert,
+
+}
+
+Then call:
+
+output_df = labour_summary_convert(uploaded_file)
+
+exactly the same way as your other converters.
