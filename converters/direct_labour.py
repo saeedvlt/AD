@@ -4,7 +4,7 @@
 import pandas as pd 
 
 def convert(input_file):
-    sheet = "Salaries - Head Count Summary"
+    sheet = "labour Summary"
     
     # Locate header row dynamically
     preview = pd.read_excel(input_file, sheet_name=sheet, header=None)
