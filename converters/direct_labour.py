@@ -92,4 +92,10 @@ def convert(input_file):
 
     df = pd.DataFrame(records)
 
+    df = df.drop_duplicates(
+        subset=["Section", "Department", "Month"],
+        keep="first"
+    ).reset_index(drop=True)
+
+return df
     return df
