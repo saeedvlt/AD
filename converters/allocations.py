@@ -107,4 +107,4 @@ def convert(uploaded_file):
     
     print(f"Finished. {len(df):,} rows written to {OUTPUT_FILE}")
 
-return pd.DataFrame(all_data)
+    return pd.DataFrame(all_data)
