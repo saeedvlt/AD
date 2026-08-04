@@ -6,6 +6,7 @@ from converters.expense import convert as expense_convert
 from converters.margin_analysis import convert as margin_analysis_convert
 from converters.sales import convert as sales_convert
 from converters.direct_labour import convert as direct_labour_convert
+from converters.allocations import convert as allocations_convert
 
 
 st.set_page_config(
@@ -31,6 +32,7 @@ CONVERTERS = {
     "Sales Template": (sales_convert, "Sales Database.xlsx"),
     "Margin Analysis": (margin_analysis_convert, "Margin Analysis Database.xlsx"),
     "Direct Labour": (direct_labour_convert, "Direct Labour Database.xlsx"),
+    "Allocations": (allocations_convert, "Allocations Database.xlsx"),
 
 }
 
@@ -40,6 +42,7 @@ UPLOAD_LABELS = {
     "Sales Template": "Upload Sales Template Workbook",
     "Margin Analysis": "Upload Margin Analysis Workbook",
     "Direct Labour": "Upload Direct Labour Workbook",
+    "Allocations": "Upload Allocations Workbook"
 }
 
 converter = st.selectbox("Choose a converter", list(CONVERTERS))
