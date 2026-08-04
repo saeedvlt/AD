@@ -97,5 +97,4 @@ def convert(input_file):
         keep="first"
     ).reset_index(drop=True)
 
-return df
     return df
