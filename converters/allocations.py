@@ -1,110 +1,97 @@
-import pandas as pd
-from openpyxl import load_workbook
+import pandas as pd from openpyxl import load_workbook
 
-# ---------------------------------------------------------
-# File paths
-# ---------------------------------------------------------
+MONTHS = ["Jan","Feb","Mar","Apr","May","Jun",
+"Jul","Aug","Sep","Oct","Nov","Dec"]
 
-MONTHS = [
-    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-]
+def _find_month_row(ws): for r in range(1, ws.max_row + 1): values =
+[ws.cell(r, c).value for c in range(1, ws.max_column + 1)] if sum(v in
+MONTHS for v in values) >= 6: return r return None
+
+def _unpivot_standard_sheet(ws, sheet_name, allocation_type): month_row
+= _find_month_row(ws) if month_row is None: return []
+
+    month_cols = {}
+    for c in range(1, ws.max_column + 1):
+        v = ws.cell(month_row, c).value
+        if v in MONTHS:
+            month_cols[c] = v
+
+    first_month_col = min(month_cols)
+
+    rows = []
+
+    for r in range(month_row + 1, ws.max_row + 1):
+
+        if all(ws.cell(r, c).value is None for c in range(1, ws.max_column + 1)):
+            continue
+
+        description = None
+
+        for c in range(1, first_month_col):
+            value = ws.cell(r, c).value
+            if isinstance(value, str) and value.strip():
+                description = value.strip()
+
+        if not description:
+            continue
+
+        for col, month in month_cols.items():
+            value = ws.cell(r, col).value
+            if value is None:
+                continue
+
+            rows.append({
+                "Allocation_Type": allocation_type,
+                "Source_Sheet": sheet_name,
+                "Description": description,
+                "Month": month,
+                "Value": value
+            })
+
+    return rows
 
 def convert(uploaded_file):
 
     wb = load_workbook(uploaded_file, data_only=True)
-    
-    all_data = [] 
-    
-    for sheet in wb.sheetnames:
-    
-        if "allocation" not in sheet.lower():
-            continue
-    
-        ws = wb[sheet]
-    
-        # ---------------------------------------------
-        # Find the row containing month headers
-        # ---------------------------------------------
-        month_row = None
-    
-        for r in range(1, ws.max_row + 1):
-    
-            values = [
-                ws.cell(r, c).value
-                for c in range(1, ws.max_column + 1)
-            ]
-    
-            month_count = sum(v in MONTHS for v in values)
-    
-            if month_count >= 6:
-                month_row = r
-                break
-    
-        if month_row is None:
-            print(f"Skipped {sheet} (no month row found)")
-            continue
-    
-        # ---------------------------------------------
-        # Month columns
-        # ---------------------------------------------
-        month_cols = {}
-    
-        for c in range(1, ws.max_column + 1):
-    
-            value = ws.cell(month_row, c).value
-    
-            if value in MONTHS:
-                month_cols[c] = value
-    
-        # ---------------------------------------------
-        # Unpivot
-        # ---------------------------------------------
-        for r in range(month_row + 1, ws.max_row + 1):
-    
-            row_values = [
-                ws.cell(r, c).value
-                for c in range(1, ws.max_column + 1)
-            ]
-    
-            # Ignore completely blank rows
-            if all(v is None for v in row_values):
-                continue
-    
-            # Find first text cell before month columns
-            description = None
-    
-            for c in range(1, min(month_cols.keys())):
-    
-                value = ws.cell(r, c).value
-    
-                if isinstance(value, str) and value.strip():
-                    description = value.strip()
-    
-            if description is None:
-                continue
-    
-            for col, month in month_cols.items():
-    
-                value = ws.cell(r, col).value
-    
-                if value is None:
-                    continue
-    
-                all_data.append({
-                    "Sheet": sheet,
-                    "Description": description,
-                    "Month": month,
-                    "Value": value
-                })
-    
-    # ---------------------------------------------------------
-    # Export
-    # ---------------------------------------------------------
-    df = pd.DataFrame(all_data)
-    
-    df.to_excel(OUTPUT_FILE, index=False)
-    
-    print(f"Finished. {len(df):,} rows written to {OUTPUT_FILE}")
 
-    return pd.DataFrame(all_data)
+    all_rows = []
+
+    sheet_map = {
+        "nads": "NADS",
+        "corp": "CORP",
+        "outside": "Outside Sales",
+        "it": "IT",
+        "dpf": "NA DPF US"
+    }
+
+    for sheet in wb.sheetnames:
+
+        name = sheet.lower()
+
+        if "allocation" not in name and "allocations" not in name:
+            continue
+
+        allocation_type = "Other"
+
+        for key, value in sheet_map.items():
+            if key in name:
+                allocation_type = value
+                break
+
+        ws = wb[sheet]
+
+        if allocation_type == "IT":
+            # TODO:
+            # IT Allocation has a different layout.
+            # Add custom parser here when finalized.
+            continue
+
+        all_rows.extend(
+            _unpivot_standard_sheet(
+                ws,
+                sheet,
+                allocation_type
+            )
+        )
+
+    return pd.DataFrame(all_rows)
