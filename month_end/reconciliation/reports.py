@@ -16,4 +16,4 @@ def transactions_frame(transactions: list[Transaction]) -> pd.DataFrame:
 
 
 def matches_frame(matches: list[dict]) -> pd.DataFrame:
-    return pd.DataFrame(matches, columns=["Match ID", "Left Amount", "Right Amount", "Difference", "Left Description", "Right Description"])
+    return pd.DataFrame(matches, columns=["Match ID", "Match Type", "Left Count", "Right Count", "Left Amount", "Right Amount", "Difference", "Left Description", "Right Description"])

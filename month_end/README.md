@@ -17,6 +17,7 @@ streamlit run month_end.py
 - Normalizes to Plant, Currency, Date, Journal, Batch, References, Description, Original Amount, Converted Amount, Status, Match ID, and source metadata.
 - Preserves amounts as `Decimal` values; no business rounding is applied.
 - Converts CAD to USD using the user-provided FX rate.
-- Performs exact one-to-one matching with only a negligible computational tolerance.
+- Performs exact one-to-one, one-to-many, many-to-one, and many-to-many matching with only a negligible computational tolerance.
+- Generates near-match 1:1 suggestions within a user-defined review threshold without auto-reconciling them.
 - Keeps unmatched CAD and USD pools ready for later one-to-many and many-to-one passes.
 - Exposes normalized transactions, match results, and unmatched pools in the app and as CSV downloads.

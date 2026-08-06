@@ -14,6 +14,8 @@ class ReconciliationConfig:
     usd_currency: str = "USD"
     cad_to_usd_rate: Decimal = Decimal("1")
     floating_tolerance: Decimal = Decimal("0.000001")
+    near_match_threshold: Decimal = Decimal("5")
+    max_group_size: int = 4
 
 
 @dataclass
