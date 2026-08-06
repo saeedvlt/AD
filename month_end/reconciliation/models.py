@@ -15,7 +15,9 @@ class ReconciliationConfig:
     cad_to_usd_rate: Decimal = Decimal("1")
     floating_tolerance: Decimal = Decimal("0.000001")
     near_match_threshold: Decimal = Decimal("5")
-    max_group_size: int = 4
+    max_group_size: int = 3
+    max_group_combinations: int = 2000
+    group_keywords: tuple[str, ...] = ("APC",)
 
 
 @dataclass

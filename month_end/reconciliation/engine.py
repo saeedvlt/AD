@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections import defaultdict
 from decimal import Decimal
 from itertools import combinations
+from math import comb
 from uuid import uuid4
 
 from .models import ReconciliationConfig, Transaction
@@ -81,6 +82,8 @@ def _find_group(target: list[Transaction] | tuple[Transaction, ...], candidates:
     if target_sign == 0:
         return None
     for group_size in range(min_group_size, config.max_group_size + 1):
+        if comb(len(candidates), group_size) > config.max_group_combinations:
+            continue
         for candidate_group in combinations(candidates, group_size):
             if not _same_side(candidate_group):
                 continue
@@ -90,6 +93,37 @@ def _find_group(target: list[Transaction] | tuple[Transaction, ...], candidates:
             if abs(target_amount - _sum_abs(candidate_group)) <= config.floating_tolerance:
                 return candidate_group
     return None
+
+
+def keyword_group_match(left: list[Transaction], right: list[Transaction], config: ReconciliationConfig) -> tuple[list[Transaction], list[Transaction], list[dict]]:
+    """Match all same-file transactions containing a configured keyword to one opposite-side entry."""
+    matches: list[dict] = []
+    remaining_left = list(left)
+    remaining_right = list(right)
+    keywords = [keyword.strip().lower() for keyword in config.group_keywords if keyword.strip()]
+    for keyword in keywords:
+        groups: dict[tuple[str, str], list[Transaction]] = defaultdict(list)
+        for transaction in remaining_left:
+            searchable = f"{transaction.description} {transaction.references}".lower()
+            if keyword in searchable:
+                groups[(transaction.source_file, transaction.source_sheet)].append(transaction)
+        for group in groups.values():
+            if not 2 <= len(group) <= config.max_group_size or not _same_side(group):
+                continue
+            candidate = next(
+                (
+                    transaction for transaction in remaining_right
+                    if _opposite_sides(group, [transaction])
+                    and abs(_sum_abs(group) - abs(transaction.converted_amount)) <= config.floating_tolerance
+                ),
+                None,
+            )
+            if candidate is None:
+                continue
+            matches.append(_record_match(f"keyword {keyword} many:1", group, [candidate]))
+            remaining_left = [transaction for transaction in remaining_left if transaction not in group]
+            remaining_right.remove(candidate)
+    return remaining_left, remaining_right, matches
 
 
 def exact_one_to_many_match(left: list[Transaction], right: list[Transaction], config: ReconciliationConfig) -> tuple[list[Transaction], list[Transaction], list[dict]]:
@@ -121,6 +155,8 @@ def exact_many_to_many_match(left: list[Transaction], right: list[Transaction], 
     remaining_left = list(left)
     remaining_right = list(right)
     for left_size in range(2, config.max_group_size + 1):
+        if comb(len(remaining_left), left_size) > config.max_group_combinations:
+            continue
         changed = True
         while changed:
             changed = False
@@ -165,6 +201,8 @@ def near_match_suggestions(left: list[Transaction], right: list[Transaction], co
 
 def reconcile(cad: list[Transaction], usd: list[Transaction], config: ReconciliationConfig) -> dict:
     unmatched_cad, unmatched_usd, matches = exact_one_to_one_match(cad, usd, config)
+    unmatched_cad, unmatched_usd, grouped = keyword_group_match(unmatched_cad, unmatched_usd, config)
+    matches.extend(grouped)
     unmatched_cad, unmatched_usd, grouped = exact_one_to_many_match(unmatched_cad, unmatched_usd, config)
     matches.extend(grouped)
     unmatched_cad, unmatched_usd, grouped = exact_many_to_one_match(unmatched_cad, unmatched_usd, config)

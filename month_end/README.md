@@ -19,5 +19,7 @@ streamlit run month_end.py
 - Converts CAD to USD using the user-provided FX rate.
 - Performs exact one-to-one, one-to-many, many-to-one, and many-to-many matching with only a negligible computational tolerance.
 - Generates near-match 1:1 suggestions within a user-defined review threshold without auto-reconciling them.
+- Prioritizes configured description keywords such as `APC`: same-file transactions containing the keyword can be grouped and matched directly to one opposite-side entry.
+- Limits generic grouped searches to three transactions by default and skips oversized combination searches for performance.
 - Keeps unmatched CAD and USD pools ready for later one-to-many and many-to-one passes.
 - Exposes normalized transactions, match results, and unmatched pools in the app and as CSV downloads.

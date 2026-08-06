@@ -20,7 +20,8 @@ with st.sidebar:
     plant = st.text_input("Plant (optional)")
     tolerance_text = st.text_input("Floating-point tolerance", value="0.000001")
     near_threshold_text = st.text_input("Near-match review threshold", value="5")
-    max_group_size = st.number_input("Maximum transactions per grouped match", min_value=2, max_value=6, value=4, step=1)
+    group_keywords_text = st.text_input("Description grouping keywords", value="APC")
+    max_group_size = st.number_input("Maximum transactions per grouped match", min_value=2, max_value=4, value=3, step=1)
     cad_files = st.file_uploader("CAD ledgers", type=["xlsx", "xls"], accept_multiple_files=True, key="cad")
     usd_files = st.file_uploader("USD ledgers", type=["xlsx", "xls"], accept_multiple_files=True, key="usd")
 
@@ -36,7 +37,8 @@ if not cad_files or not usd_files:
     st.info("Upload all CAD and USD files to begin. The loader scans every workbook sheet for ledger headers and ignores blank/balance/subtotal rows.")
     st.stop()
 
-config = ReconciliationConfig(cad_to_usd_rate=rate, floating_tolerance=tolerance, near_match_threshold=near_threshold, max_group_size=int(max_group_size))
+group_keywords = tuple(keyword.strip() for keyword in group_keywords_text.split(",") if keyword.strip())
+config = ReconciliationConfig(cad_to_usd_rate=rate, floating_tolerance=tolerance, near_match_threshold=near_threshold, max_group_size=int(max_group_size), group_keywords=group_keywords)
 with st.spinner("Loading and matching ledgers..."):
     cad_transactions = [
         transaction
