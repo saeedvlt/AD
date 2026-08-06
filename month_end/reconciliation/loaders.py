@@ -80,6 +80,37 @@ def _column_map(columns: list[object]) -> dict[str, object]:
     return result
 
 
+def _unique_headers(values: list[object]) -> list[str]:
+    """Turn blank/duplicate Excel headers into stable dataframe column names."""
+    seen: dict[str, int] = {}
+    headers: list[str] = []
+    for index, value in enumerate(values, start=1):
+        base = _clean(value) or f"Column {index}"
+        seen[base] = seen.get(base, 0) + 1
+        headers.append(base if seen[base] == 1 else f"{base} ({seen[base]})")
+    return headers
+
+
+def _infer_amount_column(data: pd.DataFrame, mapping: dict[str, object]) -> object | None:
+    """Find unlabeled amount columns used by exported ledger reports."""
+    excluded = set(mapping.values())
+    candidates: list[tuple[int, int, int, object]] = []
+    for position, column in enumerate(data.columns):
+        if column in excluded:
+            continue
+        values = [_parse_decimal(value) for value in data[column].tolist()]
+        numeric_count = sum(value is not None for value in values)
+        if numeric_count == 0:
+            continue
+        normalized = _norm_header(column)
+        keyword_bonus = 1 if any(word in normalized for word in ("amount", "debit", "credit", "balance", "total", "net")) else 0
+        candidates.append((keyword_bonus, numeric_count, position, column))
+    if not candidates:
+        return None
+    # Prefer a labeled financial column, then the densest numeric column, then the rightmost one.
+    return max(candidates)[3]
+
+
 def _read_excel(source: str | Path | bytes | BinaryIO) -> tuple[str, dict[str, pd.DataFrame]]:
     if isinstance(source, (str, Path)):
         label = Path(source).name
@@ -99,12 +130,15 @@ def load_transactions(source: str | Path | bytes | BinaryIO, currency: str, conf
         if raw.dropna(how="all").empty:
             continue
         header_row = _find_header(raw)
-        header = raw.iloc[header_row].tolist()
+        header = _unique_headers(raw.iloc[header_row].tolist())
         data = raw.iloc[header_row + 1:].copy()
         data.columns = header
         mapping = _column_map(header)
         if "amount" not in mapping:
-            continue
+            inferred_amount = _infer_amount_column(data, mapping)
+            if inferred_amount is None:
+                continue
+            mapping["amount"] = inferred_amount
         for source_row, (_, row) in enumerate(data.iterrows(), start=header_row + 2):
             amount = _parse_decimal(row.get(mapping["amount"]))
             description = _clean(row.get(mapping.get("description", "")))
