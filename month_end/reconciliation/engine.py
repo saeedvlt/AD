@@ -108,7 +108,7 @@ def keyword_group_match(left: list[Transaction], right: list[Transaction], confi
             if keyword in searchable:
                 groups[(transaction.source_file, transaction.source_sheet)].append(transaction)
         for group in groups.values():
-            if not 2 <= len(group) <= config.max_group_size or not _same_side(group):
+            if len(group) < 2 or not _same_side(group):
                 continue
             candidate = next(
                 (
@@ -200,8 +200,9 @@ def near_match_suggestions(left: list[Transaction], right: list[Transaction], co
 
 
 def reconcile(cad: list[Transaction], usd: list[Transaction], config: ReconciliationConfig) -> dict:
-    unmatched_cad, unmatched_usd, matches = exact_one_to_one_match(cad, usd, config)
-    unmatched_cad, unmatched_usd, grouped = keyword_group_match(unmatched_cad, unmatched_usd, config)
+    # Keyword groups are a fixed-format preprocessing rule and run before all generic searches.
+    unmatched_cad, unmatched_usd, matches = keyword_group_match(cad, usd, config)
+    unmatched_cad, unmatched_usd, grouped = exact_one_to_one_match(unmatched_cad, unmatched_usd, config)
     matches.extend(grouped)
     unmatched_cad, unmatched_usd, grouped = exact_one_to_many_match(unmatched_cad, unmatched_usd, config)
     matches.extend(grouped)
