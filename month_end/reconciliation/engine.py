@@ -104,7 +104,7 @@ def keyword_group_match(left: list[Transaction], right: list[Transaction], confi
     for keyword in keywords:
         groups: dict[tuple[str, str], list[Transaction]] = defaultdict(list)
         for transaction in remaining_left:
-            searchable = f"{transaction.description} {transaction.references}".lower()
+            searchable = f"{transaction.description} {transaction.references} {transaction.metadata.get('Column C', '')}".lower()
             if keyword in searchable:
                 groups[(transaction.source_file, transaction.source_sheet)].append(transaction)
         for group in groups.values():

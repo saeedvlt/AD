@@ -178,5 +178,6 @@ def load_transactions(source: str | Path | bytes | BinaryIO, currency: str, conf
                 source_file=source_file,
                 source_sheet=str(sheet_name),
                 source_row=source_row,
+                metadata={"Column C": _clean(row.iloc[2]) if len(row) > 2 else ""},
             ))
     return transactions

@@ -5,7 +5,7 @@ import pandas as pd
 from .models import Transaction
 
 
-STANDARD_COLUMNS = ["Plant", "Currency", "Date", "Journal", "Batch", "References", "Description", "Original Amount", "Converted Amount", "Status", "Match ID", "Source File", "Source Sheet", "Source Row"]
+STANDARD_COLUMNS = ["Plant", "Currency", "Date", "Journal", "Batch", "References", "Description", "Column C", "Original Amount", "Converted Amount", "Status", "Match ID", "Source File", "Source Sheet", "Source Row"]
 
 
 def transactions_frame(transactions: list[Transaction]) -> pd.DataFrame:

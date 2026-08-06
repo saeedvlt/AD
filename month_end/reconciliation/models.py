@@ -47,6 +47,7 @@ class Transaction:
             "Batch": self.batch,
             "References": self.references,
             "Description": self.description,
+            "Column C": self.metadata.get("Column C", ""),
             "Original Amount": self.original_amount,
             "Converted Amount": self.converted_amount,
             "Status": self.status,
