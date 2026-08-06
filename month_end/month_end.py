@@ -16,7 +16,7 @@ st.caption("Exact one-to-one matching with full precision after FX conversion. N
 
 with st.sidebar:
     st.header("Inputs")
-    rate_text = st.text_input("USD to CAD FX rate", value="1")
+    rate_text = st.text_input("CAD to USD FX rate", value="1")
     plant = st.text_input("Plant (optional)")
     tolerance_text = st.text_input("Floating-point tolerance", value="0.000001")
     cad_files = st.file_uploader("CAD ledgers", type=["xlsx", "xls"], accept_multiple_files=True, key="cad")
@@ -33,7 +33,7 @@ if not cad_files or not usd_files:
     st.info("Upload all CAD and USD files to begin. The loader scans every workbook sheet for ledger headers and ignores blank/balance/subtotal rows.")
     st.stop()
 
-config = ReconciliationConfig(usd_to_cad_rate=rate, floating_tolerance=tolerance)
+config = ReconciliationConfig(cad_to_usd_rate=rate, floating_tolerance=tolerance)
 with st.spinner("Loading and matching ledgers..."):
     cad_transactions = [
         transaction

@@ -113,7 +113,7 @@ def load_transactions(source: str | Path | bytes | BinaryIO, currency: str, conf
             if description.lower() in {"beginning balance", "subtotal", "total", "ending balance"}:
                 continue
             row_currency = _clean(row.get(mapping.get("currency", ""))) or currency
-            factor = config.usd_to_cad_rate if row_currency.upper() == config.usd_currency.upper() else Decimal("1")
+            factor = config.cad_to_usd_rate if row_currency.upper() == config.cad_currency.upper() else Decimal("1")
             transactions.append(Transaction(
                 plant=_clean(row.get(mapping.get("plant", ""))) or plant,
                 currency=row_currency.upper(),

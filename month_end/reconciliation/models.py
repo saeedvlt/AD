@@ -12,7 +12,7 @@ class ReconciliationConfig:
 
     cad_currency: str = "CAD"
     usd_currency: str = "USD"
-    usd_to_cad_rate: Decimal = Decimal("1")
+    cad_to_usd_rate: Decimal = Decimal("1")
     floating_tolerance: Decimal = Decimal("0.000001")
 
 
