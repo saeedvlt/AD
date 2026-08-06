@@ -12,6 +12,7 @@ streamlit run month_end.py
 ## Current behavior
 
 - Scans every workbook sheet for a ledger header row.
+- Accepts multiple CAD workbooks and multiple USD workbooks in one run.
 - Normalizes to Plant, Currency, Date, Journal, Batch, References, Description, Original Amount, Converted Amount, Status, Match ID, and source metadata.
 - Preserves amounts as `Decimal` values; no business rounding is applied.
 - Converts USD to CAD using the user-provided FX rate.

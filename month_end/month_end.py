@@ -1,4 +1,3 @@
-
 from __future__ import annotations
 
 from decimal import Decimal, InvalidOperation
@@ -20,8 +19,8 @@ with st.sidebar:
     rate_text = st.text_input("USD to CAD FX rate", value="1")
     plant = st.text_input("Plant (optional)")
     tolerance_text = st.text_input("Floating-point tolerance", value="0.000001")
-    cad_file = st.file_uploader("CAD ledger", type=["xlsx", "xls"], key="cad")
-    usd_file = st.file_uploader("USD ledger", type=["xlsx", "xls"], key="usd")
+    cad_files = st.file_uploader("CAD ledgers", type=["xlsx", "xls"], accept_multiple_files=True, key="cad")
+    usd_files = st.file_uploader("USD ledgers", type=["xlsx", "xls"], accept_multiple_files=True, key="usd")
 
 try:
     rate = Decimal(rate_text)
@@ -30,14 +29,22 @@ except InvalidOperation:
     st.error("FX rate and tolerance must be valid decimal numbers.")
     st.stop()
 
-if not cad_file or not usd_file:
-    st.info("Upload both ledgers to begin. The loader scans workbook sheets for ledger headers and ignores blank/balance/subtotal rows.")
+if not cad_files or not usd_files:
+    st.info("Upload all CAD and USD files to begin. The loader scans every workbook sheet for ledger headers and ignores blank/balance/subtotal rows.")
     st.stop()
 
 config = ReconciliationConfig(usd_to_cad_rate=rate, floating_tolerance=tolerance)
 with st.spinner("Loading and matching ledgers..."):
-    cad_transactions = load_transactions(cad_file.getvalue(), "CAD", config, plant)
-    usd_transactions = load_transactions(usd_file.getvalue(), "USD", config, plant)
+    cad_transactions = [
+        transaction
+        for file in cad_files
+        for transaction in load_transactions(file.getvalue(), "CAD", config, plant)
+    ]
+    usd_transactions = [
+        transaction
+        for file in usd_files
+        for transaction in load_transactions(file.getvalue(), "USD", config, plant)
+    ]
     result = reconcile(cad_transactions, usd_transactions, config)
 
 matched_count = len(result["matches"])
