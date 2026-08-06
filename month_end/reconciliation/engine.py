@@ -8,7 +8,7 @@ from .models import ReconciliationConfig, Transaction
 
 
 def _amount_key(value: Decimal) -> Decimal:
-    return value
+    return abs(value)
 
 
 def exact_one_to_one_match(left: list[Transaction], right: list[Transaction], config: ReconciliationConfig) -> tuple[list[Transaction], list[Transaction], list[dict]]:
@@ -21,8 +21,16 @@ def exact_one_to_one_match(left: list[Transaction], right: list[Transaction], co
     for left_txn in left:
         candidate_index = None
         for amount, indexes in right_by_amount.items():
-            if abs(left_txn.converted_amount - amount) <= config.floating_tolerance:
-                candidate_index = next((i for i in indexes if i not in used_right), None)
+            if abs(abs(left_txn.converted_amount) - amount) <= config.floating_tolerance:
+                candidate_index = next(
+                    (
+                        i for i in indexes
+                        if i not in used_right
+                        and right[i].converted_amount != 0
+                        and left_txn.converted_amount * right[i].converted_amount < 0
+                    ),
+                    None,
+                )
                 if candidate_index is not None:
                     break
         if candidate_index is None:
@@ -36,7 +44,7 @@ def exact_one_to_one_match(left: list[Transaction], right: list[Transaction], co
             "Match ID": match_id,
             "Left Amount": left_txn.converted_amount,
             "Right Amount": right_txn.converted_amount,
-            "Difference": left_txn.converted_amount - right_txn.converted_amount,
+            "Difference": left_txn.converted_amount + right_txn.converted_amount,
             "Left Description": left_txn.description,
             "Right Description": right_txn.description,
         })

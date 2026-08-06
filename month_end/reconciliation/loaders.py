@@ -38,10 +38,14 @@ def _parse_decimal(value: object) -> Decimal | None:
     text = _clean(value)
     if not text:
         return None
-    negative = text.startswith("(") and text.endswith(")")
+    negative = (text.startswith("(") and text.endswith(")")) or text.upper().endswith("CR")
     text = text.strip("() ").replace(",", "").replace("$", "").replace("€", "")
     if text.endswith("-"):
         text = "-" + text[:-1]
+    match = re.search(r"[-+]?\d[\d,]*(?:\.\d+)?", text)
+    if not match:
+        return None
+    text = match.group(0).replace(",", "")
     try:
         result = Decimal(text)
         return -result if negative else result
@@ -111,6 +115,19 @@ def _infer_amount_column(data: pd.DataFrame, mapping: dict[str, object]) -> obje
     return max(candidates)[3]
 
 
+def _ledger_amount(row: pd.Series, columns: list[object], mapping: dict[str, object]) -> Decimal | None:
+    """Read fixed-format ledger amounts: J is debit and L is credit."""
+    if len(columns) > 11:
+        debit = _parse_decimal(row.get(columns[9]))
+        credit = _parse_decimal(row.get(columns[11]))
+        if debit is not None and debit != 0:
+            return abs(debit)
+        if credit is not None and credit != 0:
+            return -abs(credit)
+    amount_column = mapping.get("amount")
+    return _parse_decimal(row.get(amount_column)) if amount_column is not None else None
+
+
 def _read_excel(source: str | Path | bytes | BinaryIO) -> tuple[str, dict[str, pd.DataFrame]]:
     if isinstance(source, (str, Path)):
         label = Path(source).name
@@ -140,7 +157,7 @@ def load_transactions(source: str | Path | bytes | BinaryIO, currency: str, conf
                 continue
             mapping["amount"] = inferred_amount
         for source_row, (_, row) in enumerate(data.iterrows(), start=header_row + 2):
-            amount = _parse_decimal(row.get(mapping["amount"]))
+            amount = _ledger_amount(row, header, mapping)
             description = _clean(row.get(mapping.get("description", "")))
             if amount is None or not description and all(_clean(v) == "" for v in row.tolist()):
                 continue

@@ -13,6 +13,7 @@ streamlit run month_end.py
 
 - Scans every workbook sheet for a ledger header row.
 - Accepts multiple CAD workbooks and multiple USD workbooks in one run.
+- For this fixed ledger export format, reads column J as debit and column L as credit; matching requires opposite-signed amounts.
 - Normalizes to Plant, Currency, Date, Journal, Batch, References, Description, Original Amount, Converted Amount, Status, Match ID, and source metadata.
 - Preserves amounts as `Decimal` values; no business rounding is applied.
 - Converts CAD to USD using the user-provided FX rate.
