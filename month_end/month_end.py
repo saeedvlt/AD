@@ -47,6 +47,10 @@ with st.spinner("Loading and matching ledgers..."):
     ]
     result = reconcile(cad_transactions, usd_transactions, config)
 
+if not cad_transactions or not usd_transactions:
+    st.error("No transaction rows were detected in one or both uploads. Check that the selected files contain ledger detail rows, not only summary pages.")
+    st.stop()
+
 matched_count = len(result["matches"])
 st.subheader("Summary")
 cols = st.columns(4)
